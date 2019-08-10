@@ -1,0 +1,553 @@
+#define OFFSET_X 1 'Offset guider x stage
+#define OFFSET_Y 2 'Offset guider y stage
+#define OFFSET_FOCUS 3 'Offset guider focus stage
+#define OFFSET_MIRRORS 4
+#define OFFSET_FWHEEL 5
+#define FWHEEL_LOWER 6
+#define FWHEEL_UPPER 7
+
+'This is so the numbers are kept in one place
+#define QOFFSET_X "1" 'Offset guider x stage
+#define QOFFSET_Y "2" 'Offset guider y stage
+#define QOFFSET_FOCUS "3" 'Offset guider focus stage
+#define QOFFSET_MIRRORS "4"
+#define QOFFSET_FWHEEL "5"
+#define QFWHEEL_LOWER "6"
+#define QFWHEEL_UPPER "7"
+
+#define QUOTE "
+
+#define HEAD_NODE hhh
+#define HOME 100
+#define HOME_SENSOR IN(10)
+#define MAXVii 0 ' Index of the MAXV in array
+#define ACCELii 1 ' Index of accel in array
+
+#define MAXV aa
+#define ACCEL bb
+#define DECEL cc
+
+#define NEG_LIMIT_RT Bm ' Real time negative limit
+#define POS_LIMIT_RT Bp ' Real time positive limit
+#define NEG_LIMIT_HIST Bl ' Historical negative limit
+#define POS_LIMIT_HIST Br ' Historical positive limit
+#define READY W(0) & 1
+#define DEBUG ddd
+
+#define ISHOMED
+
+#define EEP_SOFTWARE_LIMIT 0
+#define NEG_SLIMIT dd
+#define POS_SLIMIT ee
+
+#define SET_HOMED_BIT US(0)
+#define GET_HOMED_BIT B(12,0)
+
+#define TURN_ON_HOMING_IRLED OS(0)
+#define TURN_OFF_HOMING_IRLED OR(0)
+
+#define ENGAGE_SOLENOID OS(1)
+#define RELEASE_SOLENOID OR(1)
+
+#define SET_NODE_READY US(14)
+#define GET_NODE_READY B(12, 14)
+
+
+
+#define HEAD_NODE_SETUP_DONE gg
+
+#define FILTER_DIST hh ' Number of counts between filters 
+#define UMIRROR_POS ii ' Position of the Umirror
+#define CENTER_POS jj ' Postion of the center field mirror
+
+#define FILTER_NUMBER f
+
+
+DEBUG = 1
+GOSUB1
+
+
+SWITCH CADDR
+
+CASE OFFSET_X 
+	'GOSUB(HOME)
+	'GOSUB(OFFSET_X)
+BREAK
+CASE OFFSET_Y 
+	'GOSUB(HOME)
+	'GOSUB(OFFSET_Y) 
+BREAK
+CASE FWHEEL_LOWER
+	IF DEBUG == 1 PRINT("SETTING UP FWHEEL_LOWER", #13) ENDIF
+	EIGN(2)
+	EIGN(3)
+	SLD
+	ZS
+	
+BREAK
+CASE OFFSET_FWHEEL
+	IF DEBUG == 1 PRINT("SETTING UP OFFSET_FWHEEL", #13) ENDIF
+	EIGN(2)
+	EIGN(3)
+	SLD
+	ZS	
+BREAK
+
+ENDS
+
+
+
+END
+
+C63 'OFFSET_X subroutine
+	WHILE 1
+		IF a!=PT
+			PT=a
+			G
+			PRINT(a,#13)
+			TWAIT
+		ENDIF
+	LOOP
+RETURN
+
+
+C2 'OFFSET_Y subroutine
+	PRINT("Beginning OFFSET_Y Routine", #13)
+	
+	WHILE 1
+		IF a!=PT
+			PT=a
+			G
+			PRINT(a, #13)
+			TWAIT
+		ENDIF
+	LOOP
+RETURN
+
+C100 ' Home assuming the home sensor is only active at the index (edge detection)
+	' This subroutine is only used for the linear stages
+
+	'Algorithm:
+	' 
+	' 1. Disable software limits so we can get to the limit switch.
+	' 2. Turn on the home opitcal sensor
+	' 3. Using velocity mode, move towared the positive limit.
+	' 4. When limit is reached, move toward home sensor.
+	' 5. When home is reached, store home position and ramp down to stop.
+	' 6. Using positin mode, move to stored home position.
+	' 7. Set the homed bit
+	' 8. Enable software limits
+	' 9. Turn off the home optical sensor
+
+	IF READY == 1 ' We don't home if the motor isn't ready.
+		
+		IF DEBUG == 1 PRINT("HOMING MOTOR", #13) ENDIF
+		
+		IF B(1,10) == 1
+			eee = 1
+		ELSE
+			eee = 0
+		ENDIF
+		IF eee == 1
+			SLD 'Disable software limits
+		ENDIF
+		
+		TURN_ON_HOMING_IRLED
+		MV
+		VT=MAXV
+		G TWAIT
+		
+		
+		Zr
+		c=HOME_SENSOR ' capture homing sensor state
+		' Here is were we would turn on optical home LED
+		
+		VT=-MAXV
+		G
+		WHILE HOME_SENSOR == c 
+		' Wait till homing sensor state changes
+		' and record position of home sensor
+			b=PA
+		LOOP
+		
+		X TWAIT
+
+		' Move to home sensor position
+		MP
+		PT=b
+		G TWAIT
+		O=0 ' Set home sensor position to 0
+		SET_HOMED_BIT
+		TURN_OFF_HOMING_IRLED
+
+		IF eee == 1 ' Leave limits as we found them.
+			SLE
+		ENDIF
+		
+		IF DEBUG == 1 PRINT("MOTOR HOMED", #13) ENDIF
+	ELSE
+		IF DEBUG == 1 PRINT("MOTOR NOT READY") ENDIF
+	ENDIF
+
+RETURN
+
+C101 ' Home assuming the home sensor is only active at the index (edge detection)
+	' This subroutine is only used for the filter wheel stages
+
+	'Algorithm:
+	' 1. Turn on home optical sensor
+	' 2. Using velocity mode, move towared in the positive direction.
+	' 3. When limit is reached, move toward home sensor.
+	' 4. When home is reached, store home position and ramp down to stop.
+	' 5. Using positin mode, move to stored home position.
+	' 6. Set the homed bit
+	' 7. Enable software limits
+	' 8. Turn off home optical sensor
+
+	IF READY == 1 ' We don't home if the motor isn't ready.
+		
+		IF DEBUG == 1 PRINT("HOMING MOTOR", #13) ENDIF
+		
+		TURN_ON_HOMING_IRLED
+
+		' If we are one of the main filter wheels
+		' release the solenoide
+		IF CADDR == FWHEEL_LOWER RELEASE_SOLENOID
+		ELSEIF CADDR == FWHEEL_UPPER RELEASE_SOLENOID
+		ENDIF
+		
+		MV
+		VT=MAXV
+		G TWAIT
+		
+		
+		Zr
+		c=HOME_SENSOR ' capture homing sensor state
+		' Here is were we would turn on optical home LED
+		
+		VT=-MAXV
+		G
+		WHILE HOME_SENSOR == c 
+		' Wait till homing sensor state changes
+		' and record position of home sensor
+			b=PA
+		LOOP
+		
+		X TWAIT
+
+		' Move to home sensor position
+		MP
+		PT=b
+		G TWAIT
+		O=0 ' Set home sensor position at 0
+		SET_HOMED_BIT
+
+		IF CADDR == FWHEEL_UPPER ENGAGE_SOLENOID
+		ELSEIF CADDR == FWHEEL_LOWER ENGAGE_SOLENOID
+		ENDIF
+		
+		TURN_ON_HOMING_IRLED
+		IF DEBUG == 1 PRINT("MOTOR HOMED", #13) ENDIF
+	ELSE
+		IF DEBUG == 1 PRINT("MOTOR NOT READY") ENDIF
+	ENDIF
+
+RETURN
+
+C110 'Get out of limit
+	'Algorithm:
+	' 1. If in neg limit, move positive 5000 counts
+	' 2. If in pos limit, move negative 5000 counts
+	PRINT("MOVING OUT OF LIMIT", #13)
+	MP
+	IF NEG_LIMIT_RT == 1
+		IF DEBUG == 1 PRINT("NEG LIMIT", #13) ENDIF
+		Zl	'reset limit
+		PRT=5000
+		G TWAIT
+	ELSEIF POS_LIMIT_RT == 1
+		IF DEBUG == 1 PRINT("POS LIMIT", #13) ENDIF
+		Zr ' reset limit
+		PRT=-5000
+		G TWAIT
+	ENDIF
+	
+
+RETURN 
+		
+	
+C120 'Set the software limits
+	' Algorithm:
+	' 1. Home the motor 
+	' 2. Using vel mode move the motor toward the positive limit
+	' 3. When the limit is reached, set the positive software limit to just inside of the limit
+	' 4. Move out of the limit
+	' 5. Using vel mode move toware the negative limit
+	' 6. When the limit is reached, set the neg software limit to just inside of the limit
+	' 7. Move out of the limit
+	' 8. Enable the software limits
+
+	IF READY == 1
+		GOSUB(HOME)
+		SLD
+		MV
+		VT=MAXV/2
+		G
+		PRINT("WTF2", #13)
+		WHILE POS_LIMIT_RT == 0 LOOP
+		SLP=PA-500
+		POS_SLIMIT = SLP
+		EPTR = EEP_SOFTWARE_LIMIT+4
+		VST(POS_SLIMIT, 1)
+		PRINT("WTF3", #13)
+		GOSUB110
+		PRINT("POS SLIMIT ")
+		PRINT(SLP, #13)
+		PRINT("WTF4", #13)
+		MV
+		VT=-MAXV/2
+		G
+		PRINT("WTF5", #13)
+		WHILE Bl == 0 
+			PRINT("LOOPING ON Bl", #13)
+		LOOP
+		SLN = PA+500
+		NEG_SLIMIT = SLN
+
+		EPTR = EEP_SOFTWARE_LIMIT
+		VST(NEG_SLIMIT, 1)
+		PRINT("NEG SLIMIT ")
+		PRINT(SLN, #13)
+		GOSUB110
+		SLE
+	ELSE
+		PRINT("MOTOR NOT READY", #13)
+	ENDIF
+RETURN
+
+
+
+C200 ' Home sub assuming the home switch is active half of the travel.
+	PRINT("Homing Motor", #13)
+	MV
+	IF IN(10) == 0 ' positive side of home
+		PRINT("MOVING toward home form positive side", #13)
+		VT=-MAXV/2
+		G
+		WHILE IN(10) == 0 LOOP
+		X TWAIT
+		MP
+		PRT=-5000
+		G TWAIT
+	ENDIF
+	MV
+	VT=MAXV/2
+	G
+	PRINT("HOMING From negative side", #13)
+	WHILE IN(10) == 1
+		b=PA
+	LOOP
+	
+	X
+	TWAIT
+	MP
+	PT=b
+	G
+	TWAIT
+	O=0
+	PRINT("HOMED", #13)
+RETURN 
+
+
+
+C0  ' Startup stuff the head node motor
+	' This code only runs on the head node
+	' It writes the trajectory constants 
+	' to all motors (CADDR=1..7) on the 
+	' CAN bus. 
+
+	' TODO: If an error is recieved Bs = 1
+	' it means that the motor in question
+	' is not available and we should fault 
+	' all motors until the issue is resolved
+	' like checking for spares
+	
+
+	'Head node is whoever recieves GOSUB0 command from the serial port
+	
+	HEAD_NODE:0 = CADDR 'Let everyone know the head node address
+
+	'Clear the command error bit	
+	Zs
+
+	' Push Trajectory constants 
+	' and other info to all motors
+	MAXV:OFFSET_X = 300000
+	ACCEL:OFFSET_X = 500
+	DECEL:OFFSET_X = 500
+	WAIT=100 ' Give the error register time
+	IF Bs == 1 
+		IF DEBUG == 1 PRINT("Motor 1 (X_stage) not accessible on CAN", #13 ) ENDIF
+	ELSE
+		SET_NODE_READY:OFFSET_X
+		US(OFFSET_X)
+	ENDIF
+	
+
+	Zs
+	MAXV:OFFSET_Y = 300000
+	ACCEL:OFFSET_Y = 500
+	DECEL:OFFSET_Y = 500
+	WAIT=100
+	IF Bs == 1
+		IF DEBUG == 1 PRINT("Motor 2 (Y stage) not accessible on CAN", #13 ) ENDIF
+	ELSE
+		SET_NODE_READY:OFFSET_Y
+		US(OFFSET_Y)
+	ENDIF
+
+	Zs
+	MAXV:OFFSET_FOCUS = 300000
+	ACCEL:OFFSET_FOCUS = 500
+	DECEL:OFFSET_FOCUS = 500
+	WAIT=100
+	IF Bs == 1
+		IF DEBUG == 1 PRINT("Motor 3 (Focus stage) not accessible on CAN", #13 ) ENDIF
+	ELSE
+		SET_NODE_READY:OFFSET_FOCUS
+		US(OFFSET_FOCUS)
+	ENDIF
+
+	Zs
+	MAXV:OFFSET_MIRRORS = 300000
+	ACCEL:OFFSET_MIRRORS = 500
+	DECEL:OFFSET_MIRRORS = 500
+	UMIRROR_POS:OFFSET_MIRRORS = 30000
+	CENTER_POS:OFFSET_MIRRORS = 0
+	WAIT=100
+	IF Bs == 1
+		IF DEBUG == 1 PRINT("U-Mirror Stage not accessible on CAN", #13 ) ENDIF
+	ELSE
+		SET_NODE_READY:OFFSET_MIRRORS
+		US(OFFSET_MIRRORS)
+	ENDIF
+
+	Zs
+	MAXV:OFFSET_FWHEEL = 300000
+	ACCEL:OFFSET_FWHEEL = 500
+	DECEL:OFFSET_FWHEEL = 500
+	FILTER_DIST:OFFSET_FWHEEL = 20000
+	WAIT=100
+	IF Bs == 1
+		IF DEBUG == 1 PRINT("OFFSET Filter Wheel not accessible on CAN", #13 ) ENDIF
+	ELSE
+		SET_NODE_READY:OFFSET_FWHEEL
+		US(OFFSET_FWHEEL)
+	ENDIF
+
+	Zs
+	MAXV:FWHEEL_UPPER = 300000
+	ACCEL:FWHEEL_UPPER = 500
+	DECEL:FWHEEL_UPPER = 500
+	FILTER_DIST:FWHEEL_UPPER =20000
+	WAIT=100
+	IF Bs == 1
+		IF DEBUG == 1 PRINT("Upper Filter Wheel not accessible on CAN", #13 ) ENDIF
+	ELSE
+		SET_NODE_READY:FWHEEL_UPPER
+		US(FWHEEL_UPPER)
+	ENDIF
+
+	Zs
+	WHILE Bs==1 
+		PRINT("COMMAD ERROR", #13)
+		WAIT=3000
+	LOOP
+	MAXV:FWHEEL_LOWER = 300000
+	ACCEL:FWHEEL_LOWER = 500
+	DECEL:FWHEEL_LOWER = 500
+	FILTER_DIST:FWHEEL_LOWER = 20000
+	WAIT=100
+	IF Bs == 1
+		IF DEBUG == 1 PRINT("Lower Filter wheel not accessible on CAN", #13 ) ENDIF
+	ELSE
+		SET_NODE_READY:FWHEEL_LOWER
+		US(FWHEEL_LOWER)
+	ENDIF
+
+RETURN
+
+
+C400 ' go to filter
+	
+	MP
+	PT = f * FILTER_DIST
+	RELEASE_SOLENOID
+	G TWAIT
+	ENGAGE_SOLENOID
+	
+RETURN
+
+C1 ' All nodes startup
+	' This subroutine is meant to be run by all nodes
+
+	WHILE  GET_NODE_READY == 0
+		WAIT=500 ' Dont flood the can bus
+	LOOP
+	
+	IF CADDR == HEAD_NODE
+		PRINT("Starting setup for all motors", #12)
+	ENDIF
+
+	VT=MAXV
+	AT=ACCEL
+	DT=DECEL
+
+	
+	
+	EPTR=EEP_SOFTWARE_LIMIT	
+	VLD(NEG_SLIMIT, 1)
+
+	EPTR=EEP_SOFTWARE_LIMIT+4
+	VLD(POS_SLIMIT, 1)
+
+	IF NEG_SLIMIT == 0
+		SLD
+		IF DEBUG == 1 PRINT("SLIMIT not in EEPROM, Disabling 1", #13 ) ENDIF
+	ELSEIF POS_SLIMIT ==  0
+		SLD
+		IF DEBUG == 1 PRINT("SLIMIT not in EEPROM, Disabling 2", #13 ) ENDIF
+	ELSE
+		SLN=NEG_SLIMIT
+		SLP=POS_SLIMIT
+		SLE
+	ENDIF
+
+RETURN
+
+C55 ' Clear the command error
+	Zs
+	WHILE Bs == 1 
+		IF DEBUG == 1 PRINT("Clearing command error.", #13) ENDIF
+		WAIT=1000
+	LOOP
+RETURN	
+
+
+
+
+C50 ' Attempt to find spare
+RETURN
+
+C999 ' print map of motor number to name
+
+	PRINT("MOTOR #", QOFFSET_X, " OFFSET_X", #13)
+	PRINT("MOTOR #", QOFFSET_Y, " OFFSET_Y", #13)
+	PRINT("MOTOR #", QOFFSET_FOCUS, " OFFSET_FOCUS", #13)
+	PRINT("MOTOR #", QOFFSET_MIRRORS, " OFFSET_MIRRORS", #13)
+	PRINT("MOTOR #", QOFFSET_FWHEEL, " OFFSET_FWHEEL", #13)
+	PRINT("MOTOR #", QFWHEEL_LOWER, " FWHEEL_LOWER", #13)
+	PRINT("MOTOR #", QFWHEEL_UPPER, " FWHEEL_UPPER", #13)
+	
+RETURN
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
