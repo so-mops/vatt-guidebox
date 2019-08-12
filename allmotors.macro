@@ -64,6 +64,7 @@
 
 
 DEBUG = 1
+IF DEBUG PRINT("BEGINNING PROGRAM", #13) ENDIF
 GOSUB1
 
 
@@ -491,26 +492,29 @@ RETURN
 C1 ' All nodes startup
 	' This subroutine is meant to be run by all nodes
 
+	xxx = 1
+
 	WHILE  GET_NODE_READY == 0
 		WAIT=500 ' Dont flood the can bus
 	LOOP
-	
+	xxx = 2
 	IF CADDR == HEAD_NODE
-		PRINT("Starting setup for all motors", #12)
+		PRINT( "Starting setup for all motors", #13 )
 	ENDIF
-
+	xxx = 3
 	VT=MAXV
 	AT=ACCEL
 	DT=DECEL
 
-	
+	xxx = 4
 	
 	EPTR=EEP_SOFTWARE_LIMIT	
 	VLD(NEG_SLIMIT, 1)
-
+	xxx = 5
 	EPTR=EEP_SOFTWARE_LIMIT+4
 	VLD(POS_SLIMIT, 1)
 
+	xxx=6
 	IF NEG_SLIMIT == 0
 		SLD
 		IF DEBUG == 1 PRINT("SLIMIT not in EEPROM, Disabling 1", #13 ) ENDIF
@@ -522,7 +526,7 @@ C1 ' All nodes startup
 		SLP=POS_SLIMIT
 		SLE
 	ENDIF
-
+	xxx=7
 RETURN
 
 C55 ' Clear the command error
