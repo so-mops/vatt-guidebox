@@ -82,6 +82,8 @@ int moog_read( int rs485_fd, char resp[] )
 	return -1;// there is no data on the line
 }
 
+
+
 int moog_callsub( int rs485_fd, int subnum, int can_addr )
 {
 
@@ -184,6 +186,23 @@ int moog_lgoto(int rs485_fd, int can_addr, int pos )
 }
 
 
+
+/****************************************************
+ * Name: moog_fgoto
+ * args: rs485_fd-> serial file descriptor
+ *      can_addr-> motor number
+ *      fnum-> integer filter number. 
+ *
+ *
+ * Description:
+ * 		Moves one of the given filer wheel to the 
+ * 		fitler number. This is done by 
+ * 		setting the f variable on the motor using
+ * 		f:can_addr=fnum and movign the motor 
+ * 		by calling the subroutine gosub(400).
+ *
+ *
+ * **************************************************/
 int moog_fgoto( int rs485_fd, int can_addr, int fnum )
 {
 	char msg[10];
@@ -194,6 +213,26 @@ int moog_fgoto( int rs485_fd, int can_addr, int fnum )
 	//moog_callsub(rs485_fd, )
 }
 
+/*******************************
+ * Name: moog_getstatus
+ * args: rs485_fd-> serial file descriptor
+ * 		stat ->  status struct to be populated
+ *
+ * Description:
+ * 		Populates the given MSTATUS structure
+ * 		by querying the drive for various
+ * 		status words with the RW(WORDNUM):motor_num
+ * 		command. Each status word is a 16 bit number
+ * 		and the status codes are contained in the 
+ * 		STATUS_CODES array. 
+ *
+ * 		TODO: add other important statuses to the
+ * 		struct like a motion bit and current speed
+ * 		and acceleration. 
+ *
+ *		
+ *
+ * ***************************/
 int moog_getstatus(int rs485_fd, MSTATUS* stat)
 {
 	char msg[10];
@@ -212,7 +251,15 @@ int moog_getstatus(int rs485_fd, MSTATUS* stat)
 }
 
 
-
+/**********************************
+ * Name: print_status
+ * Arg: stat -> status struct to be printed
+ *
+ * Description:
+ * 		Pretty prints the status struct
+ * 		using the STATUS_CODES array.
+ *
+ * ********************************/
 void print_status(MSTATUS stat)
 {
 	printf("Motor %i %s:\n", stat.motor_num, stat.name);
@@ -232,6 +279,22 @@ void print_status(MSTATUS stat)
 	printf("\n\n");
 }
 
+
+/*******************************
+ * Name: build_stat_structs
+ * args: rs485_fd-> serial file descriptor
+ * 		motors - > arrary of status structs to be built
+ *
+ * Description:
+ * 		Uses the gosub(999) subroutine call
+ * 		to get a list of all the motor names 
+ * 		and their numbers from from the serial 
+ * 		line. This information is then stored 
+ * 		in the array of status structs. 
+ *
+ *
+ *
+ * ***************************/
 int build_stat_structs( int rs485_fd, MSTATUS motors[] )
 {
 	char resp[READSIZE];
