@@ -148,6 +148,7 @@ char resp[READSIZE];
 		{
 		close_port( RS485_FD );
 		RS485_FD = -1;
+		return -1;
 		}
 	fd = open_port( usbport );
 	if(fd != -1)
