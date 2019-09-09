@@ -7,7 +7,7 @@ GB_STANDALONE_OBJS = gb_serial.o gb_standalone.o gb_commands.o
 
 ###############binaries####################
 
-all: gb_standalone
+all: gb_standalone gb_indi
 
 gb_indi: $(GB_INDI_OBJS)
 	gcc $^ -lindidriver -lm -o indi-vatt-guidebox

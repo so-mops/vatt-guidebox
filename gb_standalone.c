@@ -47,6 +47,7 @@ int main(int argc, char ** argv)
                    		break;
                		case 'i': //Initialize
                    		doinit = 1;
+
                   		break;
                		case 'h': //home
                    		dohome = 1;

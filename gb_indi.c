@@ -33,14 +33,14 @@
 
  /* Definitions */
 
-#define USBPORT "/dev/ttyUSB0"
+#define TTYPORT "/dev/ttyUSB0"
 
 #define mydev		"INDI-VATT-GUIDEBOX"
  #define MAIN_GROUP      "Guider Control"                  /* Group name */
  
   #define POLLMS          250                             /* poll period, ms */
 
-
+int RS485_FD;
 
 // main connection switch
    static ISwitch connectS[] = {
@@ -200,7 +200,7 @@ static INumber ofwNR[] = {{"OFFSET FILTER POSITION","Offset Filter Position", "%
                  return;
              }
 	     
-             offsetFocusGoTo(RS485_FD, (int)values[0]);
+             stageGoTo(RS485_FD, "OFFSET_FOCUS", (int)values[0]);
 	
 	     offFocNPR.s = IPS_IDLE;
 	     IDSetNumber(&offFocNPR, NULL);
@@ -216,7 +216,7 @@ static INumber ofwNR[] = {{"OFFSET FILTER POSITION","Offset Filter Position", "%
                  return;
              }
              
-             offsetXGoTo(RS485_FD, (int)values[0]);
+             stageGoTo(RS485_FD, "OFFSET_X", (int)values[0]);
 	
 	     offxNPR.s = IPS_IDLE;
 	     IDSetNumber(&offxNPR, NULL);
@@ -232,7 +232,7 @@ static INumber ofwNR[] = {{"OFFSET FILTER POSITION","Offset Filter Position", "%
                  return;
              }
              
-             offsetYGoTo(RS485_FD, (int)values[0]);
+             stageGoTo(RS485_FD, "OFFSET_Y", (int)values[0]);
 	
 	     offyNPR.s = IPS_IDLE;
 	     IDSetNumber(&offyNPR, NULL);
@@ -248,7 +248,7 @@ static INumber ofwNR[] = {{"OFFSET FILTER POSITION","Offset Filter Position", "%
                  return;
              }
              
-             upperFilterGoTo(RS485_FD, (int)values[0]);
+             stageGoTo(RS485_FD, "FWHEEL_UPPER", (int)values[0]);
 	
 	     ufwNPR.s = IPS_IDLE;
 	     IDSetNumber(&ufwNPR, NULL);
@@ -264,7 +264,7 @@ static INumber ofwNR[] = {{"OFFSET FILTER POSITION","Offset Filter Position", "%
                  return;
              }
              
-             lowerFilterGoTo(RS485_FD, (int)values[0]);
+             stageGoTo(RS485_FD, "FWHEEL_LOWER", (int)values[0]);
 	
 	     lfwNPR.s = IPS_IDLE;
 	     IDSetNumber(&lfwNPR, NULL);
@@ -280,7 +280,7 @@ static INumber ofwNR[] = {{"OFFSET FILTER POSITION","Offset Filter Position", "%
                  return;
              }
              
-             offsetFilterGoTo(RS485_FD, (int)values[0]);
+             stageGoTo(RS485_FD, "OFFSET_FWHEEL", (int)values[0]);
 	
 	     ofwNPR.s = IPS_IDLE;
 	     IDSetNumber(&ofwNPR, NULL);
@@ -296,8 +296,8 @@ static INumber ofwNR[] = {{"OFFSET FILTER POSITION","Offset Filter Position", "%
                  return;
              }
              
-             offsetMirrorsGoTo(RS485_FD, (int)values[0]);
-	
+             stageGoTo(RS485_FD, "OFFSET_MIRRORS", (int)values[0]);
+
 	     offMirrNPR.s = IPS_IDLE;
 	     IDSetNumber(&offMirrNPR, NULL);
              return;
@@ -342,7 +342,7 @@ void ISNewSwitch (const char *dev, const char *name, ISState *states, char *name
 			//sp->s = states[0];
 			connectS[0].s = ISS_ON;
 			connectS[1].s = ISS_OFF;
-			RS485_FD = guider_init(1, USBPORT);
+			RS485_FD = ttyOpen(TTYPORT);
 			IDSetSwitch (&connectSP, "Guider is connected.");
 
 		}
@@ -354,7 +354,7 @@ void ISNewSwitch (const char *dev, const char *name, ISState *states, char *name
 			connectS[0].s = ISS_OFF;
 			connectS[1].s = ISS_ON;
 			connectSP.s = IPS_IDLE;
-			RS485_FD = guider_init(0, USBPORT);
+			ttyClose(RS485_FD);
 			IDSetSwitch (&connectSP, "Guider is disconnected.");
 				
 		}
@@ -376,14 +376,14 @@ void ISNewSwitch (const char *dev, const char *name, ISState *states, char *name
 			if (sp == &actionS[0]) 
 			{
 				IDMessage(mydev, "Initializing Guider");
-				//err = ng_command(" DOME INIT ", ret);  
+				guider_init( RS485_FD ); 
 			}
 			 
 			/*  home  */ 
 			else if (sp == &actionS[1]) 
 			{
 				IDMessage(mydev, "Homing Guider");
-				//err = ng_command(" DOME STOW ", ret);  
+				  
 			}
 			 
 			/*  auto  */ 
