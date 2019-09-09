@@ -81,37 +81,37 @@ ISwitchVectorProperty actionSP      = { mydev, "GUIDE_BOX_ACTIONS", "Guide Box A
 //Upper Filter Goto
 static INumber ufwNR[] = {{"UPPER FILTER","Upper Filter", "%i",0., 90., 0., 0., 0, 0, 0}, };
 
- static INumberVectorProperty ufwNPR = {  mydev, "UPPER_FILT_REQUEST", "ufw goto",  MAIN_GROUP , IP_WO, 0, IPS_IDLE,  ufwNR, NARRAY(ufwNR), "", 0};
+ static INumberVectorProperty ufwNPR = {  mydev, "UPPER_FILT_REQUEST", "ufw goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  ufwNR, NARRAY(ufwNR), "", 0};
 
 //Lower Filter Goto
 static INumber lfwNR[] = {{"LOWER FILTER","Lower Filter", "%i",0., 90., 0., 0., 0, 0, 0}, };
 
- static INumberVectorProperty lfwNPR = {  mydev, "LOER_FILT_REQUEST", "lfw goto",  MAIN_GROUP , IP_WO, 0, IPS_IDLE,  lfwNR, NARRAY(lfwNR), "", 0};
+ static INumberVectorProperty lfwNPR = {  mydev, "LOER_FILT_REQUEST", "lfw goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  lfwNR, NARRAY(lfwNR), "", 0};
 
 //Offset X Goto
 static INumber offxNR[] = {{"OFFSET X POSITION","Offset X Position", "%i",0., 90., 0., 0., 0, 0, 0}, };
 
- static INumberVectorProperty offxNPR = {  mydev, "OFF_X_REQUEST", "offset x goto",  MAIN_GROUP , IP_WO, 0, IPS_IDLE,  offxNR, NARRAY(offxNR), "", 0};
+ static INumberVectorProperty offxNPR = {  mydev, "OFF_X_REQUEST", "offset x goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  offxNR, NARRAY(offxNR), "", 0};
 
 //Offset Y Goto
 static INumber offyNR[] = {{"OFFSET Y POSITION","Offset Y Position", "%i",0., 90., 0., 0., 0, 0, 0}, };
 
- static INumberVectorProperty offyNPR = {  mydev, "OFF_Y_REQUEST", "offset y goto",  MAIN_GROUP , IP_WO, 0, IPS_IDLE,  offyNR, NARRAY(offyNR), "", 0};
+ static INumberVectorProperty offyNPR = {  mydev, "OFF_Y_REQUEST", "offset y goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  offyNR, NARRAY(offyNR), "", 0};
 
 //Offset Focus Goto
 static INumber offFocNR[] = {{"OFFSET FOCUS","Offset Focus", "%i",0., 90., 0., 0., 0, 0, 0}, };
 
- static INumberVectorProperty offFocNPR = {  mydev, "OFFSET_FOCUS_REQUEST", "offset foc goto",  MAIN_GROUP , IP_WO, 0, IPS_IDLE,  offFocNR, NARRAY(offFocNR), "", 0};
+ static INumberVectorProperty offFocNPR = {  mydev, "OFFSET_FOCUS_REQUEST", "offset foc goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  offFocNR, NARRAY(offFocNR), "", 0};
 
 //Offset Mirror Goto
 static INumber offMirrNR[] = {{"OFFSET MIRROR POSITION","Offset Mirror Position", "%i",0., 90., 0., 0., 0, 0, 0}, };
 
- static INumberVectorProperty offMirrNPR = {  mydev, "OFFMIRR_REQUEST", "offset mirror goto",  MAIN_GROUP , IP_WO, 0, IPS_IDLE,  offMirrNR, NARRAY(offMirrNR), "", 0};
+ static INumberVectorProperty offMirrNPR = {  mydev, "OFFMIRR_REQUEST", "offset mirror goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  offMirrNR, NARRAY(offMirrNR), "", 0};
 
 //Offset Filter Goto
 static INumber ofwNR[] = {{"OFFSET FILTER POSITION","Offset Filter Position", "%i",0., 90., 0., 0., 0, 0, 0}, };
 
- static INumberVectorProperty ofwNPR = {  mydev, "OFW_REQUEST", "offset filter goto",  MAIN_GROUP , IP_WO, 0, IPS_IDLE,  ofwNR, NARRAY(ofwNR), "", 0};
+ static INumberVectorProperty ofwNPR = {  mydev, "OFW_REQUEST", "offset filter goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  ofwNR, NARRAY(ofwNR), "", 0};
 
 
  /* Note that we must define ISNewBLOB and ISSnoopDevice even if we don't use them, otherwise, the driver will NOT compile */
