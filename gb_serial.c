@@ -160,7 +160,9 @@ set_blocking (int fd, int should_block)
 int open_port( char usbport[] )
 {
 	int fd; /* File descriptor for the port */
-	const char happy_char_port[2] = {(char) 128, '\0'};
+
+	char serialfix = 128;
+
 
 	/*fd = open(usbport, O_RDWR | O_NOCTTY | O_NDELAY);
 	fcntl(fd, F_SETFL, FNDELAY);
@@ -185,9 +187,11 @@ int open_port( char usbport[] )
 	set_interface_attribs (fd, B9600, 0);  // set speed to 9600 bps, 8n1 (no parity)
 	set_blocking (fd, 0);                // set no blocking
 	
+  // this is necessary, not sure why.
+	write (fd, &serialfix, 1);           // send 1 character greeting
 
-	// this is necessary, not sure why.
-	moog_write(fd, happy_char_port);
+	
+	
 	return (fd);
 }
 
