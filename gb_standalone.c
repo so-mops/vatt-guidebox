@@ -21,7 +21,6 @@
  #include "gb_commands.h"
 
 void domessage(char *av0, char *message);
-int doTelemetry(int port__fd);
 
 /*############################################################################
 #  Title: main
@@ -35,7 +34,7 @@ int main(int argc, char ** argv)
 {
 	char strPort[100], strAxis[20];
 	int doinit=0, dohome=0, domove=0, dohelp=0;
-	int value=0, opt, iaxis, port_fd, isFilter=0;
+	int value=0, opt, iaxis, ttyfd, isFilter=0;
 	int axisinit=0, portinit=0, valinit=0, dotelem=0;
 
 	while ((opt = getopt(argc, argv, "p:ihmta:tv:?")) != -1) 
@@ -89,8 +88,8 @@ int main(int argc, char ** argv)
 		}
 	
 	//check and see if port opens
-	port_fd = open_port( strPort );
-	if(port_fd == -1)
+	ttyfd = ttyOpen( strPort );
+	if(ttyfd == -1)
 		{
 		fprintf(stderr, "\nError Opening Port %s\n", strPort);
 		exit(EXIT_FAILURE);
@@ -101,24 +100,23 @@ int main(int argc, char ** argv)
 	if (doinit)
 		{
 		printf("INITIALIZING!!!\n");
-		guider_init( port_fd );
-		close_port( port_fd );
-		//port_init( 0, NULL, port_fd );
+		guider_init( ttyfd );
+		ttyClose( ttyfd );
 		exit(0);
 		}
 
 	//grab telemetry
 	if(dotelem)
 		{
-		doTelemetry(port_fd);
-		close_port( port_fd );
+		doTelemetry(ttyfd);
+		ttyClose( ttyfd );
 		exit(0);
 		}
 	
 	//validate [axis] before we proceed
 	if(!axisinit)
 		{
-		close_port( port_fd );
+		ttyClose( ttyfd );
 		domessage(argv[0], "ERROR!!!  Must specify valid axis");
 		
 		}
@@ -126,7 +124,7 @@ int main(int argc, char ** argv)
 	iaxis = validateAxis(strAxis, &isFilter);
 	if(!iaxis)
 		{
-		close_port( port_fd );
+		ttyClose( ttyfd );
 		domessage(argv[0], "ERROR!!!  invalid axis");
 			
 		}
@@ -136,8 +134,8 @@ int main(int argc, char ** argv)
 	else if (dohome)
 		{
 		printf("HOMING %s!!!\n", strAxis);
-		moog_home( port_fd, iaxis );
-		close_port( port_fd );
+		stageHome( ttyfd, strAxis );
+		ttyClose( ttyfd );
 		exit(0);
 		}
 
@@ -146,30 +144,17 @@ int main(int argc, char ** argv)
 		{
 		if((!axisinit)||(!valinit))
 			{
-			close_port( port_fd );
+			ttyClose( ttyfd );
 			domessage(argv[0], "ERROR!!!  Must specify valid axis and value");
 			}
 		printf("MOVING %s to %i!!!\n", strAxis, value);
-		if (strcmp(strAxis, "OFFSET_X")==0)
-			offsetXGoTo(port_fd, value);
-		else if (strcmp(strAxis, "OFFSET_Y")==0)
-			offsetYGoTo(port_fd, value);
-		else if (strcmp(strAxis, "OFFSET_FOCUS")==0)
-			offsetFocusGoTo(port_fd, value);
-		else if (strcmp(strAxis, "OFFSET_MIRRORS")==0)
-			offsetMirrorsGoTo(port_fd, value);
-		else if (strcmp(strAxis, "OFFSET_FWHEEL")==0)
-			offsetFilterGoTo(port_fd, value);
-		else if (strcmp(strAxis, "FWHEEL_LOWER")==0)
-			lowerFilterGoTo(port_fd, value);
-		else if (strcmp(strAxis, "FWHEEL_UPPER")==0)
-			upperFilterGoTo(port_fd, value);
+		stageGoTo(ttyfd, strAxis, value);
 		}
 	else
 		{
 		domessage(argv[0], "ERROR!!!  Unknown Command");
 		}
-	close_port( port_fd );
+	ttyClose( ttyfd );
 		
 
 }
@@ -190,13 +175,14 @@ void domessage(char *av0, char *message)
 
 	fprintf(stderr, "\nVATT Guide Box Command Interface v.42\n");
         fprintf(stderr, "code name: Don't Panic!\n\n");
-        fprintf(stderr, "Usage: %s -r -p[port] -m -a[axis] -v[value]\n",av0);
+        fprintf(stderr, "Usage: %s -p[port] -m -a[axis] -v[value]\n",av0);
         fprintf(stderr, "    -p: set port to [port]  exe. /dev/ttyUSB0\n");
-        fprintf(stderr, "    -i: initialize [wont do any additional actions]\n");
+        fprintf(stderr, "    -i: initialize [ignores all other arguments]\n");
         fprintf(stderr, "    -h: home axis [axis]\n");
         fprintf(stderr, "    -m: move axis [axis]to value [value]\n");
         fprintf(stderr, "    -a: set axis to [axis]  exe. FWHEEL_LOWER\n");
         fprintf(stderr, "    -v: set axis value to [value]  exe. 200\n");
+        fprintf(stderr, "    -t: get telemetry data\n");
         fprintf(stderr, "    -?: print this help message\n");
         fprintf(stderr, "\nValid Axis:\n");
         fprintf(stderr, "    OFFSET_X\n");
@@ -213,106 +199,6 @@ void domessage(char *av0, char *message)
 
 }
 
-/*############################################################################
-#  Title: doTelemetry
-#  Author: C.Johnson
-#  Date: 9/4/19
-#  Args:  
-#  Description: grabs telemetry from guider
-#
-#############################################################################*/
-int doTelemetry(int port_fd)
-{
-char resp[200];
-int active, x;
-
-printf("pretending to do telemetry\n");
-	moog_write( port_fd, "RW(12)"  ); //user bits that show which motors are active
-	x=moog_read( port_fd, resp );
-	if(x>0)
-		printf("moog_response = %s\n", resp);
-	else
-		printf("no_response\n");
-	
-	active = atoi(resp);
-
-	for(int num=1; num<9; num++)
-	{
-		if(active & (1<<num))
-		{
-			moog_getstatus(port_fd, &allmotors[num-1]);
-			print_status( allmotors[ num-1 ] );
-		}
-	}
-
-}
-
-/****************************************************
- * Name: main_old
- * Author: Scott Swindell
- * Date 7/20/2019
- * desc: original main function by Scott Swindell
- *    keeping here for historic purposes
- * 
- *********************************************/
-
- int main2(int argc, char ** argv)
-{
-	MSTATUS allmotors[7];
-	char resp[100];	
-	char buf[10];
-	int active;
-
-	if( argc != 2 )
-	{
-		printf( "\nUsage: %s <usbport>\n Like:%s /dev/ttyUSB0\n", argv[0], argv[0] );
-		exit(2);
-	}
-
-	int fd = open_port( argv[1] );
-	if(fd == -1)
-		exit(-1);
-
-	moog_read(fd, resp);
-	moog_init( fd );
-	build_stat_structs(fd, allmotors); //Map names to numbers
-
-	moog_write( fd, "RW(12)"  ); //user bits that show which motors are active
-	moog_read( fd, resp );
-	active = atoi(resp);
-
-	for(int num=1; num<9; num++)
-	{
-		if(active & (1<<num))
-		{
-			moog_getstatus(fd, &allmotors[num-1]);
-			print_status( allmotors[ num-1 ] );
-		}
-	}
-
-	//moog_home( fd, OFFSET_Y );
-	/*Wait 3 seconds till home
-	 * we should instead check the 
-	 * is-homed bit, which is not implemented yet
-	 *
-	 * */
-	//sleep(3);
-	
-	// move the offset Y axis to 10000
-	moog_lgoto(fd, OFFSET_Y, 10000);
-	sleep(3);
-	
-	// move guider fwheel to filter #5
-	moog_fgoto(fd, OFFSET_FWHEEL, 5 );
-	sleep(3);
 
 
-	// move lower fwheel to filter #5
-	moog_fgoto(fd, FWHEEL_LOWER, 5 );
-	sleep(3);
 
-
-	close( fd );
-
-
-}

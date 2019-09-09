@@ -24,7 +24,7 @@ gb_commands.o: gb_commands.c
 gb_indi.o: gb_indi.c
 	gcc -c gb_indi.c
 
-gb_standalone.o: gb_standalone.c
+gb_standalone.o: gb_standalone.c 
 	gcc -c gb_standalone.c
 
 

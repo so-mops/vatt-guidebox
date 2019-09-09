@@ -18,117 +18,90 @@
  #include <sys/time.h>
  #include <time.h>
 
+ #include "gb_serial.h"
  #include "gb_commands.h"
 
+MSTATUS allmotors[7];
+
+
 
 /*############################################################################
-#  Title: offsetXGoTo
+#  Title: stageHome
 #  Author: C.Johnson
-#  Date: 8/20/19
+#  Date: 9/9/19
 #  Args:  N/A
 #  Description: 
 #
 #############################################################################*/
- void offsetXGoTo (int port_fd, int POSITION)
+ int stageHome (int ttyfd, char *stage)
  { 
-       moog_lgoto(port_fd, OFFSET_X, POSITION);
-
-	//handle setting motion status here	  
-         
+ return 1;
+      
  }
 
 /*############################################################################
-#  Title: offsetYGoTo
+#  Title: ttyOpen
 #  Author: C.Johnson
-#  Date: 8/20/19
+#  Date: 9/9/19
 #  Args:  N/A
 #  Description: 
 #
 #############################################################################*/
- void offsetYGoTo (int port_fd, int POSITION)
+ int ttyOpen (char *ttyPort)
  { 
-       moog_lgoto(port_fd, OFFSET_Y, POSITION);
-
-	//handle setting motion status here	  
-         
+ int ttyfd;
+  
+	ttyfd = open_port( ttyPort );
+	return ttyfd;
+      
  }
 
 /*############################################################################
-#  Title: offsetFocusGoTo
+#  Title: ttyClose
 #  Author: C.Johnson
-#  Date: 8/20/19
+#  Date: 9/9/19
 #  Args:  N/A
 #  Description: 
 #
 #############################################################################*/
- void offsetFocusGoTo (int port_fd, int POSITION)
+ void ttyClose (int ttyfd)
  { 
-       moog_lgoto(port_fd, OFFSET_FOCUS, POSITION);
+  close_port( ttyfd );
 
-	//handle setting motion status here	  
-         
+        	
  }
 
+
+
 /*############################################################################
-#  Title: offsetMirrorsGoTo
+#  Title: stageGoTo
 #  Author: C.Johnson
-#  Date: 8/20/19
+#  Date: 9/9/19
 #  Args:  N/A
 #  Description: 
 #
 #############################################################################*/
- void offsetMirrorsGoTo (int port_fd, int POSITION)
+ int stageGoTo (int port_fd, char *strAxis, int POSITION)
  { 
-       moog_lgoto(port_fd, OFFSET_MIRRORS, POSITION);
+  int isFilter=0, iAxis;
+	iAxis = validateAxis(strAxis, &isFilter);
+	if (iAxis < 1)
+		{
+		return 0;
+		}
+	if (isFilter)
+		{
+		moog_fgoto(port_fd, iAxis, POSITION);
+		}
+       else
+		{
+		moog_lgoto(port_fd, iAxis, POSITION);
+		}
+       return iAxis;
 
-	//handle setting motion status here	  
-         
+        	
  }
 
-/*############################################################################
-#  Title: offsetFilterGoTo
-#  Author: C.Johnson
-#  Date: 8/20/19
-#  Args:  N/A
-#  Description: 
-#
-#############################################################################*/
- void offsetFilterGoTo (int port_fd, int POSITION)
- { 
-         moog_fgoto(port_fd, OFFSET_FWHEEL, POSITION); 
-
-         //handle setting motion status here	
- }
-
-/*############################################################################
-#  Title: lowerFilterGoTo
-#  Author: C.Johnson
-#  Date: 8/20/19
-#  Args:  N/A
-#  Description: 
-#
-#############################################################################*/
- void lowerFilterGoTo (int port_fd, int POSITION)
- { 
-         moog_fgoto(port_fd, FWHEEL_LOWER, POSITION); 
-
-         //handle setting motion status here	
- }
-
-/*############################################################################
-#  Title: upperFilterGoTo
-#  Author: C.Johnson
-#  Date: 8/20/19
-#  Args:  N/A
-#  Description: 
-#
-#############################################################################*/
- void upperFilterGoTo (int port_fd, int POSITION)
- { 
-         moog_fgoto(port_fd, FWHEEL_UPPER, POSITION); 
-
-         //handle setting motion status here	
- }
 
 /*############################################################################
 #  Title: guider_init( char usbport[] )
@@ -146,7 +119,7 @@ char resp[READSIZE];
 	moog_read(port_fd, resp);
 	printf("moog_resp=%s\n", resp);
 	moog_init( port_fd );
-	build_stat_structs(port_fd, allmotors); //Map names to numbers
+	//build_stat_structs(port_fd, allmotors); //Map names to numbers
 	
 	
 }
@@ -213,4 +186,38 @@ else
 	iaxis = 0;
 
 return iaxis;
+}
+
+/*############################################################################
+#  Title: doTelemetry
+#  Author: C.Johnson
+#  Date: 9/4/19
+#  Args:  
+#  Description: grabs telemetry from guider
+#
+#############################################################################*/
+int doTelemetry(int port_fd)
+{
+char resp[200];
+int active, x;
+
+printf("pretending to do telemetry\n");
+	moog_write( port_fd, "RW(12)"  ); //user bits that show which motors are active
+	x=moog_read( port_fd, resp );
+	if(x>0)
+		printf("moog_response = %s\n", resp);
+	else
+		printf("no_response\n");
+	
+	active = atoi(resp);
+
+	for(int num=1; num<9; num++)
+	{
+		if(active & (1<<num))
+		{
+			moog_getstatus(port_fd, &allmotors[num-1]);
+			print_status( allmotors[ num-1 ] );
+		}
+	}
+
 }
