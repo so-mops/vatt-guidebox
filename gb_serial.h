@@ -9,7 +9,7 @@
 
 
 #define SENDSIZE 100
-#define READSIZE 100
+#define READSIZE 2000
 
 typedef struct 
 {

@@ -27,18 +27,8 @@
 
 
 /* header for this project */
-#include "gb_serial.h"
-
-//Globals
-int RS485_FD = -1;
-MSTATUS allmotors[7];
+#include "gb_commands.h"
 	
-
-/* Function protptypes */
-void linearGoTo (int AXID, int POSITION);
-void filterGoTo (int AXID, int POSITION);
-int guider_init( int act, char *usbport );
-
 
 
  /* Definitions */
@@ -210,7 +200,7 @@ static INumber ofwNR[] = {{"OFFSET FILTER POSITION","Offset Filter Position", "%
                  return;
              }
 	     
-             linearGoTo(OFFSET_FOCUS, (int)values[0]);
+             offsetFocusGoTo(RS485_FD, (int)values[0]);
 	
 	     offFocNPR.s = IPS_IDLE;
 	     IDSetNumber(&offFocNPR, NULL);
@@ -226,7 +216,7 @@ static INumber ofwNR[] = {{"OFFSET FILTER POSITION","Offset Filter Position", "%
                  return;
              }
              
-             linearGoTo(OFFSET_X, (int)values[0]);
+             offsetXGoTo(RS485_FD, (int)values[0]);
 	
 	     offxNPR.s = IPS_IDLE;
 	     IDSetNumber(&offxNPR, NULL);
@@ -242,7 +232,7 @@ static INumber ofwNR[] = {{"OFFSET FILTER POSITION","Offset Filter Position", "%
                  return;
              }
              
-             linearGoTo(OFFSET_Y, (int)values[0]);
+             offsetYGoTo(RS485_FD, (int)values[0]);
 	
 	     offyNPR.s = IPS_IDLE;
 	     IDSetNumber(&offyNPR, NULL);
@@ -258,7 +248,7 @@ static INumber ofwNR[] = {{"OFFSET FILTER POSITION","Offset Filter Position", "%
                  return;
              }
              
-             filterGoTo(FWHEEL_UPPER, (int)values[0]);
+             upperFilterGoTo(RS485_FD, (int)values[0]);
 	
 	     ufwNPR.s = IPS_IDLE;
 	     IDSetNumber(&ufwNPR, NULL);
@@ -274,7 +264,7 @@ static INumber ofwNR[] = {{"OFFSET FILTER POSITION","Offset Filter Position", "%
                  return;
              }
              
-             filterGoTo(FWHEEL_LOWER, (int)values[0]);
+             lowerFilterGoTo(RS485_FD, (int)values[0]);
 	
 	     lfwNPR.s = IPS_IDLE;
 	     IDSetNumber(&lfwNPR, NULL);
@@ -290,7 +280,7 @@ static INumber ofwNR[] = {{"OFFSET FILTER POSITION","Offset Filter Position", "%
                  return;
              }
              
-             filterGoTo(OFFSET_FWHEEL, (int)values[0]);
+             offsetFilterGoTo(RS485_FD, (int)values[0]);
 	
 	     ofwNPR.s = IPS_IDLE;
 	     IDSetNumber(&ofwNPR, NULL);
@@ -306,7 +296,7 @@ static INumber ofwNR[] = {{"OFFSET FILTER POSITION","Offset Filter Position", "%
                  return;
              }
              
-             linearGoTo(OFFSET_MIRRORS, (int)values[0]);
+             offsetMirrorsGoTo(RS485_FD, (int)values[0]);
 	
 	     offMirrNPR.s = IPS_IDLE;
 	     IDSetNumber(&offMirrNPR, NULL);
@@ -407,66 +397,7 @@ void ISNewSwitch (const char *dev, const char *name, ISState *states, char *name
 	
 }
 
-/*############################################################################
-#  Title: linearGoTo
-#  Author: C.Johnson
-#  Date: 8/20/19
-#  Args:  N/A
-#  Description: 
-#
-#############################################################################*/
- void linearGoTo (int AXID, int POSITION)
- { 
-       moog_lgoto(RS485_FD, AXID, POSITION);
 
-	//handle setting motion status here	  
-         
- }
-
-/*############################################################################
-#  Title: filterGoTo
-#  Author: C.Johnson
-#  Date: 8/20/19
-#  Args:  N/A
-#  Description: 
-#
-#############################################################################*/
- void filterGoTo (int AXID, int POSITION)
- { 
-         moog_fgoto(RS485_FD, AXID, POSITION); 
-
-         //handle setting motion status here	
- }
-
-/*############################################################################
-#  Title: guider_init( char usbport[] )
-#  Author: C.Johnson
-#  Date: 9/3/19
-#  Args:  N/A
-#  Description: 
-#
-#############################################################################*/
-int guider_init( int act, char *usbport )
-{
-int fd; /* File descriptor for the port */
-char resp[READSIZE];
-
-
-	if(act != 1)
-		{
-		close_port( RS485_FD );
-		RS485_FD = -1;
-		}
-	fd = open_port( usbport );
-	if(fd != -1)
-		{
-		moog_read(fd, resp);
-		moog_init( fd );
-		build_stat_structs(fd, allmotors); //Map names to numbers
-		}
-	return (fd);
-	
-}
 
 
 
