@@ -162,7 +162,7 @@ int open_port( char usbport[] )
 	int fd; /* File descriptor for the port */
 
 
-	fd = open(usbport, O_RDWR | O_NOCTTY | O_NDELAY);
+	/*fd = open(usbport, O_RDWR | O_NOCTTY | O_NDELAY);
 	fcntl(fd, F_SETFL, FNDELAY);
 	if (fd == -1)
 	{
@@ -171,19 +171,19 @@ int open_port( char usbport[] )
 	}
 
 
-	/*fd = open (usbport, O_RDWR | O_NOCTTY | O_SYNC);
+	else
+		fcntl(fd, F_SETFL, 0);*/
+
+
+	fd = open (usbport, O_RDWR | O_NOCTTY | O_SYNC);
 	if (fd < 0)
 		{
-        	perror("open_port: Unable to open port");
-        	}*/	
+        	error_message ("error %d opening %s: %s", errno, usbport, strerror (errno));
+        	return (fd);
+		}	
 
-	
-	else
-		{
-		fcntl(fd, F_SETFL, 0);
-		set_interface_attribs (fd, B9600, 0);  // set speed to 9600 bps, 8n1 (no parity)
-		set_blocking (fd, 0);                // set no blocking
-		}
+	set_interface_attribs (fd, B9600, 0);  // set speed to 9600 bps, 8n1 (no parity)
+	set_blocking (fd, 0);                // set no blocking
 	
 
 	return (fd);
