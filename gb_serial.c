@@ -160,7 +160,7 @@ set_blocking (int fd, int should_block)
 int open_port( char usbport[] )
 {
 	int fd; /* File descriptor for the port */
-
+	const char happy_char_port[2] = {(char) 128, '\0'};
 
 	/*fd = open(usbport, O_RDWR | O_NOCTTY | O_NDELAY);
 	fcntl(fd, F_SETFL, FNDELAY);
@@ -186,6 +186,8 @@ int open_port( char usbport[] )
 	set_blocking (fd, 0);                // set no blocking
 	
 
+	// this is necessary, not sure why.
+	moog_write(fd, happy_char_port);
 	return (fd);
 }
 
@@ -279,11 +281,13 @@ int moog_callsub( int rs485_fd, int subnum, int can_addr )
 int moog_init(int rs485_fd )
 {
 	
-	char resp[100];
+	char resp[10000];
+
 	moog_write(rs485_fd, "Z:0"); //reset all nodes
 	sleep(1);
 	moog_write(rs485_fd, "GOSUB(0)" ); // start head node
 	usleep(200000);
+
 	while ( moog_read(rs485_fd, resp) !=-1 )
 	{
 		printf("%s\n", resp);// starting head node print a bunch of stuff

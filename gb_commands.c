@@ -146,7 +146,7 @@ char resp[READSIZE];
 	moog_read(port_fd, resp);
 	printf("moog_resp=%s\n", resp);
 	moog_init( port_fd );
-	build_stat_structs(port_fd, allmotors); //Map names to numbers
+	//build_stat_structs(port_fd, allmotors); //Map names to numbers
 	
 	
 }
