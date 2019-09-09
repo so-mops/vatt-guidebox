@@ -21,7 +21,7 @@
  #include "gb_commands.h"
 
 void domessage(char *av0, char *message);
-int validateAxis(char *axis);
+int doTelemetry(int port__fd);
 
 /*############################################################################
 #  Title: main
@@ -35,10 +35,10 @@ int main(int argc, char ** argv)
 {
 	char strPort[100], strAxis[20];
 	int doinit=0, dohome=0, domove=0, dohelp=0;
-	int value=0, opt, iaxis, port_fd;
-	int axisinit=0, portinit=0, valinit=0;
+	int value=0, opt, iaxis, port_fd, isFilter=0;
+	int axisinit=0, portinit=0, valinit=0, dotelem=0;
 
-	while ((opt = getopt(argc, argv, "p:ihma:v:?")) != -1) 
+	while ((opt = getopt(argc, argv, "p:ihmta:tv:?")) != -1) 
 		{
                	switch (opt) 
 			{
@@ -62,6 +62,9 @@ int main(int argc, char ** argv)
                		case 'v': //Set Value
                    		value=atoi(optarg);
 				valinit = 1;
+                   		break;
+               		case 't': //get telemetry
+                   		dotelem = 1;
                    		break;
                		case '?': //HELP!!!
                    		dohelp=1;
@@ -98,8 +101,20 @@ int main(int argc, char ** argv)
 	if (doinit)
 		{
 		printf("INITIALIZING!!!\n");
+		guider_init( port_fd );
+		close_port( port_fd );
+		//port_init( 0, NULL, port_fd );
+		exit(0);
 		}
 
+	//grab telemetry
+	if(dotelem)
+		{
+		doTelemetry(port_fd);
+		close_port( port_fd );
+		exit(0);
+		}
+	
 	//validate [axis] before we proceed
 	if(!axisinit)
 		{
@@ -108,7 +123,7 @@ int main(int argc, char ** argv)
 		
 		}
 	
-	iaxis = validateAxis(strAxis);
+	iaxis = validateAxis(strAxis, &isFilter);
 	if(!iaxis)
 		{
 		close_port( port_fd );
@@ -164,7 +179,7 @@ int main(int argc, char ** argv)
 #  Author: C.Johnson
 #  Date: 9/4/19
 #  Args:  char *av0 = pointer to name of command issued to start program
-	char *message = optional message to append to beginning
+#	char *message = optional message to append to beginning
 #  Description: prints the help message
 #
 #############################################################################*/
@@ -199,40 +214,38 @@ void domessage(char *av0, char *message)
 }
 
 /*############################################################################
-#  Title: validateAxis(char *axis)
+#  Title: doTelemetry
 #  Author: C.Johnson
-#  Date: 9/3/19
-#  Args:  char *axis
-#  Description: validates the axis string and returns an appropriate port int
-#    otherwise returns 0
+#  Date: 9/4/19
+#  Args:  
+#  Description: grabs telemetry from guider
 #
 #############################################################################*/
-int validateAxis(char *axis)
+int doTelemetry(int port_fd)
 {
-int iaxis;
-if (strcmp(axis, "OFFSET_X")==0)
-	iaxis=OFFSET_X;
-else if (strcmp(axis, "OFFSET_Y")==0)
-	iaxis=OFFSET_Y;
-else if (strcmp(axis, "OFFSET_FOCUS")==0)
-	iaxis=OFFSET_FOCUS;
-else if (strcmp(axis, "OFFSET_MIRRORS")==0)
-	iaxis=OFFSET_MIRRORS;
-else if (strcmp(axis, "OFFSET_FWHEEL")==0)
-	iaxis=OFFSET_FWHEEL;
-else if (strcmp(axis, "FWHEEL_LOWER")==0)
-	iaxis=FWHEEL_LOWER;
-else if (strcmp(axis, "FWHEEL_UPPER")==0)
-	iaxis=FWHEEL_UPPER;
-else 
-	iaxis = 0;
+char resp[200];
+int active, x;
 
-return iaxis;
+printf("pretending to do telemetry\n");
+	moog_write( port_fd, "RW(12)"  ); //user bits that show which motors are active
+	x=moog_read( port_fd, resp );
+	if(x>0)
+		printf("moog_response = %s\n", resp);
+	else
+		printf("no_response\n");
+	
+	active = atoi(resp);
+
+	for(int num=1; num<9; num++)
+	{
+		if(active & (1<<num))
+		{
+			moog_getstatus(port_fd, &allmotors[num-1]);
+			print_status( allmotors[ num-1 ] );
+		}
+	}
+
 }
-
-
-
-
 
 /****************************************************
  * Name: main_old
@@ -243,7 +256,7 @@ return iaxis;
  * 
  *********************************************/
 
- int main_old(int argc, char ** argv)
+ int main2(int argc, char ** argv)
 {
 	MSTATUS allmotors[7];
 	char resp[100];	
@@ -277,13 +290,13 @@ return iaxis;
 		}
 	}
 
-	moog_home( fd, OFFSET_Y );
+	//moog_home( fd, OFFSET_Y );
 	/*Wait 3 seconds till home
 	 * we should instead check the 
 	 * is-homed bit, which is not implemented yet
 	 *
 	 * */
-	sleep(3);
+	//sleep(3);
 	
 	// move the offset Y axis to 10000
 	moog_lgoto(fd, OFFSET_Y, 10000);

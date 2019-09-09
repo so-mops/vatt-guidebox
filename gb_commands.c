@@ -29,9 +29,9 @@
 #  Description: 
 #
 #############################################################################*/
- void offsetXGoTo (int RS485_FD, int POSITION)
+ void offsetXGoTo (int port_fd, int POSITION)
  { 
-       moog_lgoto(RS485_FD, OFFSET_X, POSITION);
+       moog_lgoto(port_fd, OFFSET_X, POSITION);
 
 	//handle setting motion status here	  
          
@@ -45,9 +45,9 @@
 #  Description: 
 #
 #############################################################################*/
- void offsetYGoTo (int RS485_FD, int POSITION)
+ void offsetYGoTo (int port_fd, int POSITION)
  { 
-       moog_lgoto(RS485_FD, OFFSET_Y, POSITION);
+       moog_lgoto(port_fd, OFFSET_Y, POSITION);
 
 	//handle setting motion status here	  
          
@@ -61,9 +61,9 @@
 #  Description: 
 #
 #############################################################################*/
- void offsetFocusGoTo (int RS485_FD, int POSITION)
+ void offsetFocusGoTo (int port_fd, int POSITION)
  { 
-       moog_lgoto(RS485_FD, OFFSET_FOCUS, POSITION);
+       moog_lgoto(port_fd, OFFSET_FOCUS, POSITION);
 
 	//handle setting motion status here	  
          
@@ -77,9 +77,9 @@
 #  Description: 
 #
 #############################################################################*/
- void offsetMirrorsGoTo (int RS485_FD, int POSITION)
+ void offsetMirrorsGoTo (int port_fd, int POSITION)
  { 
-       moog_lgoto(RS485_FD, OFFSET_MIRRORS, POSITION);
+       moog_lgoto(port_fd, OFFSET_MIRRORS, POSITION);
 
 	//handle setting motion status here	  
          
@@ -93,9 +93,9 @@
 #  Description: 
 #
 #############################################################################*/
- void offsetFilterGoTo (int RS485_FD, int POSITION)
+ void offsetFilterGoTo (int port_fd, int POSITION)
  { 
-         moog_fgoto(RS485_FD, OFFSET_FWHEEL, POSITION); 
+         moog_fgoto(port_fd, OFFSET_FWHEEL, POSITION); 
 
          //handle setting motion status here	
  }
@@ -108,9 +108,9 @@
 #  Description: 
 #
 #############################################################################*/
- void lowerFilterGoTo (int RS485_FD, int POSITION)
+ void lowerFilterGoTo (int port_fd, int POSITION)
  { 
-         moog_fgoto(RS485_FD, FWHEEL_LOWER, POSITION); 
+         moog_fgoto(port_fd, FWHEEL_LOWER, POSITION); 
 
          //handle setting motion status here	
  }
@@ -123,9 +123,9 @@
 #  Description: 
 #
 #############################################################################*/
- void upperFilterGoTo (int RS485_FD, int POSITION)
+ void upperFilterGoTo (int port_fd, int POSITION)
  { 
-         moog_fgoto(RS485_FD, FWHEEL_UPPER, POSITION); 
+         moog_fgoto(port_fd, FWHEEL_UPPER, POSITION); 
 
          //handle setting motion status here	
  }
@@ -138,25 +138,79 @@
 #  Description: 
 #
 #############################################################################*/
-int guider_init( int act, char *usbport )
+int guider_init( int port_fd )
 {
-int fd; /* File descriptor for the port */
 char resp[READSIZE];
 
 
-	if(act != 1)
-		{
-		close_port( RS485_FD );
-		RS485_FD = -1;
-		return -1;
-		}
-	fd = open_port( usbport );
-	if(fd != -1)
-		{
-		moog_read(fd, resp);
-		moog_init( fd );
-		build_stat_structs(fd, allmotors); //Map names to numbers
-		}
-	return (fd);
+	moog_read(port_fd, resp);
+	printf("moog_resp=%s\n", resp);
+	moog_init( port_fd );
+	build_stat_structs(port_fd, allmotors); //Map names to numbers
 	
+	
+}
+
+/*############################################################################
+#  Title: port_init( int open, char usbport[], int port_fd )
+#  Author: C.Johnson
+#  Date: 9/6/19
+#  Args:  N/A
+#  Description: 
+#
+#############################################################################*/
+int port_init( int open, char usbport[], int port_fd )
+{
+
+
+	if (open)
+		port_fd = open_port( usbport );	
+	else
+		close_port(port_fd);
+
+
+	return port_fd;
+	
+}
+
+
+
+/*############################################################################
+#  Title: validateAxis(char *axis)
+#  Author: C.Johnson
+#  Date: 9/3/19
+#  Args:  char *axis -> string of axis name
+#	int *isFilter -> pointer to integer flag to say whether this is a filter.
+#  Description: validates the axis string and returns an appropriate port int
+#    otherwise returns 0
+#
+#############################################################################*/
+int validateAxis(char *axis, int *isFilter)
+{
+int iaxis;
+if (strcmp(axis, "OFFSET_X")==0){
+	iaxis=OFFSET_X;
+	*isFilter=0;}
+else if (strcmp(axis, "OFFSET_Y")==0){
+	iaxis=OFFSET_Y;
+	*isFilter=0;}
+else if (strcmp(axis, "OFFSET_FOCUS")==0){
+	iaxis=OFFSET_FOCUS;
+	*isFilter=0;}
+else if (strcmp(axis, "OFFSET_MIRRORS")==0){
+	iaxis=OFFSET_MIRRORS;
+	*isFilter=0;}
+else if (strcmp(axis, "OFFSET_FWHEEL")==0){
+	iaxis=OFFSET_FWHEEL;
+	*isFilter=1;}
+else if (strcmp(axis, "FWHEEL_LOWER")==0){
+	iaxis=FWHEEL_LOWER;
+	*isFilter=1;}
+else if (strcmp(axis, "FWHEEL_UPPER")==0){
+	iaxis=FWHEEL_UPPER;
+	*isFilter=1;}
+else 
+	iaxis = 0;
+
+return iaxis;
 }
