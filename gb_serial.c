@@ -160,8 +160,9 @@ set_blocking (int fd, int should_block)
 int open_port( char usbport[] )
 {
 	int fd; /* File descriptor for the port */
+
 	char serialfix = 128;
-		
+
 
 	/*fd = open(usbport, O_RDWR | O_NOCTTY | O_NDELAY);
 	fcntl(fd, F_SETFL, FNDELAY);
@@ -186,8 +187,11 @@ int open_port( char usbport[] )
 	set_interface_attribs (fd, B9600, 0);  // set speed to 9600 bps, 8n1 (no parity)
 	set_blocking (fd, 0);                // set no blocking
 	
+  // this is necessary, not sure why.
 	write (fd, &serialfix, 1);           // send 1 character greeting
 
+	
+	
 	return (fd);
 }
 
@@ -281,11 +285,13 @@ int moog_callsub( int rs485_fd, int subnum, int can_addr )
 int moog_init(int rs485_fd )
 {
 	
-	char resp[100];
+	char resp[10000];
+
 	moog_write(rs485_fd, "Z:0"); //reset all nodes
 	sleep(1);
 	moog_write(rs485_fd, "GOSUB(0)" ); // start head node
 	usleep(200000);
+
 	while ( moog_read(rs485_fd, resp) !=-1 )
 	{
 		printf("%s\n", resp);// starting head node print a bunch of stuff
