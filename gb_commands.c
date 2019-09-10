@@ -21,8 +21,7 @@
  #include "gb_serial.h"
  #include "gb_commands.h"
 
-MSTATUS allmotors[7];
-
+//MSTATUS allmotors[7];
 
 /*############################################################################
 #  Title: stageHome
@@ -186,7 +185,7 @@ return iaxis;
 #	example routine.
 #
 #############################################################################*/
-int doTelemetry(int ttyfd)
+int doTelemetry(int ttyfd, MSTATUS)
 {
 char resp[200];
 int active, x;

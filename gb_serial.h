@@ -22,6 +22,7 @@ typedef struct
 	int isActive;
 	int isFilter;
 
+
 } MSTATUS;
 
 

@@ -19,6 +19,8 @@
  #include <time.h>
 
  #include "gb_commands.h"
+ #include "gb_serial.h"
+ 
 
 void domessage(char *av0, char *message);
 
@@ -109,7 +111,7 @@ int main(int argc, char ** argv)
 	//grab telemetry
 	if(dotelem)
 		{
-		doTelemetry(ttyfd);
+		displayTelem(ttyfd);
 		ttyClose( ttyfd );
 		exit(0);
 		}
@@ -159,6 +161,36 @@ int main(int argc, char ** argv)
 	ttyClose( ttyfd );
 		
 
+}
+
+/*############################################################################
+#  Title: displayTelemetry(char *av0, char *message)
+#  Author: C.Johnson
+#  Date: 9/4/19
+#  Args:  char *av0 = pointer to name of command issued to start program
+#	char *message = optional message to append to beginning
+#  Description: prints the help message
+#
+#############################################################################*/
+void displayTelem(int ttyfd)
+{
+MSTATUS allmotors[7];
+
+int ix;
+	doTelemetry(ttyfd);
+	for(ix=0;ix<7;ix++)
+		{
+		printf("******Stage %i*******\n", ix);
+		printf("\tactive=%i\n",allmotors->words);
+		printf("\twords=%i\n", allmotors->words);
+		printf("\tuserbits=%i\n", allmotors->userbits);
+		printf("\tmotor_num=%i\n", allmotors->motor_num);
+		printf("\tpos=%i\n", allmotors->pos);
+		printf("\tname=%s\n", allmotors->name);
+		printf("\tfnum=%i\n", allmotors->fnum);
+		}
+	
+		
 }
 
 /*############################################################################
