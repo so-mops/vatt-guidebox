@@ -372,7 +372,8 @@ int moog_lgoto(int rs485_fd, int can_addr, int pos )
 	snprintf( msg, 40, "PT:%i=%i", can_addr, pos );
 	moog_write(rs485_fd, (const char *) msg);
 	usleep(100); // this is probably not necessary
-	moog_write(rs485_fd, "G"); //GO!
+	snprintf(msg, 40, "G:%i", can_addr );
+	moog_write(rs485_fd, (const char *) msg ); //GO!
 
 	return 0;
 }
