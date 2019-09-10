@@ -18,7 +18,6 @@
  #include <sys/time.h>
  #include <time.h>
 
- #include "gb_serial.h"
  #include "gb_commands.h"
 
 //MSTATUS allmotors[7];
@@ -185,7 +184,7 @@ return iaxis;
 #	example routine.
 #
 #############################################################################*/
-int doTelemetry(int ttyfd, MSTATUS)
+int doTelemetry(int ttyfd, MSTATUS *allmotors)
 {
 char resp[200];
 int active, x;

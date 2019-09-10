@@ -19,10 +19,11 @@
  #include <time.h>
 
  #include "gb_commands.h"
- #include "gb_serial.h"
  
 
 void domessage(char *av0, char *message);
+void displayTelem(int ttyfd);
+
 
 /*############################################################################
 #  Title: main
@@ -177,17 +178,17 @@ void displayTelem(int ttyfd)
 MSTATUS allmotors[7];
 
 int ix;
-	doTelemetry(ttyfd);
+	doTelemetry(ttyfd, allmotors);
 	for(ix=0;ix<7;ix++)
 		{
 		printf("******Stage %i*******\n", ix);
-		printf("\tactive=%i\n",allmotors->words);
-		printf("\twords=%i\n", allmotors->words);
-		printf("\tuserbits=%i\n", allmotors->userbits);
-		printf("\tmotor_num=%i\n", allmotors->motor_num);
-		printf("\tpos=%i\n", allmotors->pos);
-		printf("\tname=%s\n", allmotors->name);
-		printf("\tfnum=%i\n", allmotors->fnum);
+		printf("\tactive=%i\n",allmotors[ix].isActive);
+		//printf("\twords=%i\n", allmotors[ix].words);
+		printf("\tuserbits=%i\n", allmotors[ix].userbits);
+		printf("\tmotor_num=%i\n", allmotors[ix].motor_num);
+		printf("\tpos=%i\n", allmotors[ix].pos);
+		printf("\tname=%s\n", allmotors[ix].name);
+		printf("\tfnum=%i\n", allmotors[ix].fnum);
 		}
 	
 		
