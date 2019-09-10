@@ -69,7 +69,7 @@ static ITextVectorProperty stdTelemTP = {  mydev, "stTELEM", "Guider Telemetry",
 
 
 /************************************************
-Group:  GOTO
+Group:  MAIN
 ************************************************/
 //guider actions
 static ISwitch actionS[]  = {{"INITIALIZE",  "Initialize",  ISS_OFF, 0, 0},{"HOME",  "Home",  ISS_OFF, 0, 0}};
@@ -77,41 +77,50 @@ static ISwitch actionS[]  = {{"INITIALIZE",  "Initialize",  ISS_OFF, 0, 0},{"HOM
 ISwitchVectorProperty actionSP      = { mydev, "GUIDE_BOX_ACTIONS", "Guide Box Actions",  MAIN_GROUP, IP_RW, ISR_NOFMANY, 0, IPS_IDLE,  actionS, NARRAY(actionS), "", 0 };
 
 
+/*
+#define OFFSET_X 1 //Offset guider x stage
+#define OFFSET_Y 2 //Offset guider y stage
+#define OFFSET_FOCUS 3 //Offset guider focus stage
+#define OFFSET_MIRRORS 4
+#define OFFSET_FWHEEL 5
+#define FWHEEL_LOWER 6
+#define FWHEEL_UPPER 7
+*/
 
 //Upper Filter Goto
 static INumber ufwNR[] = {{"UPPER FILTER","Upper Filter", "%i",0., 90., 0., 0., 0, 0, 0}, };
 
- static INumberVectorProperty ufwNPR = {  mydev, "UPPER_FILT_REQUEST", "ufw goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  ufwNR, NARRAY(ufwNR), "", 0};
+ static INumberVectorProperty ufwNPR = {  mydev, "FWHEEL_UPPER", "Upper Filter Wheel goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  ufwNR, NARRAY(ufwNR), "", 0};
 
 //Lower Filter Goto
 static INumber lfwNR[] = {{"LOWER FILTER","Lower Filter", "%i",0., 90., 0., 0., 0, 0, 0}, };
 
- static INumberVectorProperty lfwNPR = {  mydev, "LOER_FILT_REQUEST", "lfw goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  lfwNR, NARRAY(lfwNR), "", 0};
+ static INumberVectorProperty lfwNPR = {  mydev, "FWHEEL_LOWER", "Lower Filter Wheel goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  lfwNR, NARRAY(lfwNR), "", 0};
 
 //Offset X Goto
 static INumber offxNR[] = {{"OFFSET X POSITION","Offset X Position", "%i",0., 90., 0., 0., 0, 0, 0}, };
 
- static INumberVectorProperty offxNPR = {  mydev, "OFF_X_REQUEST", "offset x goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  offxNR, NARRAY(offxNR), "", 0};
+ static INumberVectorProperty offxNPR = {  mydev, "OFFSET_X", "offset x goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  offxNR, NARRAY(offxNR), "", 0};
 
 //Offset Y Goto
 static INumber offyNR[] = {{"OFFSET Y POSITION","Offset Y Position", "%i",0., 90., 0., 0., 0, 0, 0}, };
 
- static INumberVectorProperty offyNPR = {  mydev, "OFF_Y_REQUEST", "offset y goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  offyNR, NARRAY(offyNR), "", 0};
+ static INumberVectorProperty offyNPR = {  mydev, "OFFSET_Y", "offset y goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  offyNR, NARRAY(offyNR), "", 0};
 
 //Offset Focus Goto
 static INumber offFocNR[] = {{"OFFSET FOCUS","Offset Focus", "%i",0., 90., 0., 0., 0, 0, 0}, };
 
- static INumberVectorProperty offFocNPR = {  mydev, "OFFSET_FOCUS_REQUEST", "offset foc goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  offFocNR, NARRAY(offFocNR), "", 0};
+ static INumberVectorProperty offFocNPR = {  mydev, "OFFSET_FOCUS", "offset foc goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  offFocNR, NARRAY(offFocNR), "", 0};
 
 //Offset Mirror Goto
 static INumber offMirrNR[] = {{"OFFSET MIRROR POSITION","Offset Mirror Position", "%i",0., 90., 0., 0., 0, 0, 0}, };
 
- static INumberVectorProperty offMirrNPR = {  mydev, "OFFMIRR_REQUEST", "offset mirror goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  offMirrNR, NARRAY(offMirrNR), "", 0};
+ static INumberVectorProperty offMirrNPR = {  mydev, "OFFSET_MIRRORS", "offset mirror goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  offMirrNR, NARRAY(offMirrNR), "", 0};
 
 //Offset Filter Goto
 static INumber ofwNR[] = {{"OFFSET FILTER POSITION","Offset Filter Position", "%i",0., 90., 0., 0., 0, 0, 0}, };
 
- static INumberVectorProperty ofwNPR = {  mydev, "OFW_REQUEST", "offset filter goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  ofwNR, NARRAY(ofwNR), "", 0};
+ static INumberVectorProperty ofwNPR = {  mydev, "OFFSET_FWHEEL", "offset filter goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  ofwNR, NARRAY(ofwNR), "", 0};
 
 
  /* Note that we must define ISNewBLOB and ISSnoopDevice even if we don't use them, otherwise, the driver will NOT compile */
@@ -122,11 +131,11 @@ static INumber ofwNR[] = {{"OFFSET FILTER POSITION","Offset Filter Position", "%
 
 /*############################################################################
 #  Title: ISGetProperties
-#  Author: C Johnson
-#  Date: 8/20/19
-#  Args:  N/A
-#  Description: Called by the client app to get properties available
-#		
+#  Author: C.Johnson
+#  Date: 9/9/19
+#  Args:  
+#  Returns: N/A
+#  Description: publishes all properties that will be displayed by the driver
 #
 #############################################################################*/
  void ISGetProperties (const char *dev)
@@ -163,10 +172,12 @@ static INumber ofwNR[] = {{"OFFSET FILTER POSITION","Offset Filter Position", "%
 
 /*############################################################################
 #  Title: ISNewText
-#  Author: E.C. Downey
-#  Date: ???
-#  Args:  N/A
-#  Description: 
+#  Author: C.Johnson
+#  Date: 9/9/19
+#  Args: default indi definition
+#  Returns: N/A
+#  Description: Catches all new text events.  Required to be here even if
+#	not used 
 #
 #############################################################################*/
  void ISNewText (const char *dev, const char *name, char *texts[], char *names[], int n)
@@ -177,9 +188,11 @@ static INumber ofwNR[] = {{"OFFSET FILTER POSITION","Offset Filter Position", "%
 /*############################################################################
 #  Title: ISNewNumber
 #  Author: C.Johnson
-#  Date: 8/20/19
-#  Args:  N/A
-#  Description: 
+#  Date: 9/9/19
+#  Args: default indi definition
+#  Returns: N/A
+#  Description: Catches all new number events.  Required to be here even if
+#	not used 
 #
 #############################################################################*/
  void ISNewNumber (const char *dev, const char *name, double values[], char *names[], int n)
@@ -200,7 +213,7 @@ static INumber ofwNR[] = {{"OFFSET FILTER POSITION","Offset Filter Position", "%
                  return;
              }
 	     
-             stageGoTo(RS485_FD, "OFFSET_FOCUS", (int)values[0]);
+             stageGoTo(RS485_FD, offFocNPR.name, (int)values[0]);
 	
 	     offFocNPR.s = IPS_IDLE;
 	     IDSetNumber(&offFocNPR, NULL);
@@ -216,7 +229,7 @@ static INumber ofwNR[] = {{"OFFSET FILTER POSITION","Offset Filter Position", "%
                  return;
              }
              
-             stageGoTo(RS485_FD, "OFFSET_X", (int)values[0]);
+             stageGoTo(RS485_FD, offxNPR.name, (int)values[0]);
 	
 	     offxNPR.s = IPS_IDLE;
 	     IDSetNumber(&offxNPR, NULL);
@@ -232,7 +245,7 @@ static INumber ofwNR[] = {{"OFFSET FILTER POSITION","Offset Filter Position", "%
                  return;
              }
              
-             stageGoTo(RS485_FD, "OFFSET_Y", (int)values[0]);
+             stageGoTo(RS485_FD, offyNPR.name, (int)values[0]);
 	
 	     offyNPR.s = IPS_IDLE;
 	     IDSetNumber(&offyNPR, NULL);
@@ -248,7 +261,7 @@ static INumber ofwNR[] = {{"OFFSET FILTER POSITION","Offset Filter Position", "%
                  return;
              }
              
-             stageGoTo(RS485_FD, "FWHEEL_UPPER", (int)values[0]);
+             stageGoTo(RS485_FD, ufwNPR.name, (int)values[0]);
 	
 	     ufwNPR.s = IPS_IDLE;
 	     IDSetNumber(&ufwNPR, NULL);
@@ -264,7 +277,7 @@ static INumber ofwNR[] = {{"OFFSET FILTER POSITION","Offset Filter Position", "%
                  return;
              }
              
-             stageGoTo(RS485_FD, "FWHEEL_LOWER", (int)values[0]);
+             stageGoTo(RS485_FD, lfwNPR.name, (int)values[0]);
 	
 	     lfwNPR.s = IPS_IDLE;
 	     IDSetNumber(&lfwNPR, NULL);
@@ -280,7 +293,7 @@ static INumber ofwNR[] = {{"OFFSET FILTER POSITION","Offset Filter Position", "%
                  return;
              }
              
-             stageGoTo(RS485_FD, "OFFSET_FWHEEL", (int)values[0]);
+             stageGoTo(RS485_FD, ofwNPR.name, (int)values[0]);
 	
 	     ofwNPR.s = IPS_IDLE;
 	     IDSetNumber(&ofwNPR, NULL);
@@ -296,7 +309,7 @@ static INumber ofwNR[] = {{"OFFSET FILTER POSITION","Offset Filter Position", "%
                  return;
              }
              
-             stageGoTo(RS485_FD, "OFFSET_MIRRORS", (int)values[0]);
+             stageGoTo(RS485_FD, offMirrNPR.name, (int)values[0]);
 
 	     offMirrNPR.s = IPS_IDLE;
 	     IDSetNumber(&offMirrNPR, NULL);
@@ -312,10 +325,12 @@ static INumber ofwNR[] = {{"OFFSET FILTER POSITION","Offset Filter Position", "%
 
 /*############################################################################
 #  Title: ISNewSwitch
-#  Author: E.C. Downey
-#  Date: 11/20/12
-#  Args:  N/A
-#  Description: 
+#  Author: C.Johnson
+#  Date: 9/9/19
+#  Args: default indi definition
+#  Returns: N/A
+#  Description: Catches all new switch events.  Required to be here even if
+#	not used 
 #
 #############################################################################*/
 void ISNewSwitch (const char *dev, const char *name, ISState *states, char *names[], int n)
@@ -397,6 +412,8 @@ void ISNewSwitch (const char *dev, const char *name, ISState *states, char *name
 	
 	
 }
+
+
 
 
 

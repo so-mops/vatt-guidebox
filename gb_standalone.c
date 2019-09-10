@@ -34,7 +34,7 @@ int main(int argc, char ** argv)
 {
 	char strPort[100], strAxis[20];
 	int doinit=0, dohome=0, domove=0, dohelp=0;
-	int value=0, opt, iaxis, ttyfd, isFilter=0;
+	int value=0, opt, iaxis, ttyfd, isFilter=0, test;
 	int axisinit=0, portinit=0, valinit=0, dotelem=0;
 
 	while ((opt = getopt(argc, argv, "p:ihmta:tv:?")) != -1) 
@@ -149,7 +149,8 @@ int main(int argc, char ** argv)
 			domessage(argv[0], "ERROR!!!  Must specify valid axis and value");
 			}
 		printf("MOVING %s to %i!!!\n", strAxis, value);
-		stageGoTo(ttyfd, strAxis, value);
+		test=stageGoTo(ttyfd, strAxis, value);
+		printf("moved stage %i\n", test);
 		}
 	else
 		{

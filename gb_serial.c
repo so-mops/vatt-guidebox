@@ -90,8 +90,18 @@ const char * STATUS_CODES[4][16] = {
 
 };
 
-int
-set_interface_attribs (int fd, int speed, int parity)
+/*############################################################################
+#  Title: set_interface_attribs
+#  Author: C.Johnson
+#  Date: 9/9/19
+#  Args:  int fd -> tty port file descriptor
+#	  int speed -> serial speed
+#	  int polarity -> serial polarity
+#  Returns: 0 on success, non zero on failure
+#  Description: setup tty port serial attibutes for port referred to  by fd
+#
+#############################################################################*/
+int set_interface_attribs (int fd, int speed, int parity)
 {
         struct termios tty;
         memset (&tty, 0, sizeof tty);
@@ -131,8 +141,17 @@ set_interface_attribs (int fd, int speed, int parity)
         return 0;
 }
 
-void
-set_blocking (int fd, int should_block)
+/*############################################################################
+#  Title: set_blocking
+#  Author: C.Johnson
+#  Date: 9/9/19
+#  Args:  int fd -> tty port file descriptor
+#	  int should_block -> 1 for blocking, 0 for non blocking
+#  Returns: N/A
+#  Description: setup tty port blocking attribute for port referred to  by fd
+#
+#############################################################################*/
+void set_blocking (int fd, int should_block)
 {
         struct termios tty;
         memset (&tty, 0, sizeof tty);
