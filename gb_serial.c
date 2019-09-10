@@ -256,7 +256,7 @@ int moog_read( int rs485_fd, char resp[] )
 		if(select( rs485_fd+1, &set, NULL, NULL, &timeout ) == 1)
 		{
 			rn = read(rs485_fd, resp+ii, 1);
-			printf("%i %c\n", ii, resp[ii]);
+			//printf("%i %c\n", ii, resp[ii]);
 			if(resp[ii] == '\r')
 			{
 				resp[ii] = '\0';
@@ -431,9 +431,25 @@ int moog_getstatus(int rs485_fd, MSTATUS* stat)
 	char msg[10];
 	char resp[READSIZE];
 	int error;
+
+	moog_read(rs485_fd, resp);//flush--probably unecessary
+
+	snprintf(msg, 10, "RPA:%i", stat->motor_num);
+	moog_write(rs485_fd, (const char *) msg );
+	if( moog_read(rs485_fd, resp) == 0)
+	{
+		stat->pos = atoi(resp);
+	}
+
+	snprintf(msg, 10, "f:%i", stat->motor_num);
+	moog_write(rs485_fd, (const char *) msg );
+	if( moog_read(rs485_fd, resp) == 0)
+	{
+		stat->fnum = atoi(resp);
+	}
+
 	for(int ii=0; ii<4; ii++)
 	{
-
 		snprintf( msg, 10, "RW(%i):%i", ii, stat->motor_num );
 		moog_write( rs485_fd, (const char *) msg );
 		error = moog_read(rs485_fd, resp);
@@ -456,7 +472,8 @@ int moog_getstatus(int rs485_fd, MSTATUS* stat)
 void print_status(MSTATUS stat)
 {
 	printf("Motor %i %s:\n", stat.motor_num, stat.name);
-
+	printf("  Pos == %i\n", stat.pos);
+	printf("  fnum == %i\n", stat.fnum);
 	//report the first 4 status words
 	for( int word_ii=0; word_ii<4; word_ii++ )
 	{
@@ -469,6 +486,7 @@ void print_status(MSTATUS stat)
 			}
 		}
 	}
+
 	printf("\n\n");
 }
 

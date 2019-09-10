@@ -9,14 +9,16 @@
 
 
 #define SENDSIZE 100
-#define READSIZE 2000
+#define READSIZE 10000
 
 typedef struct 
 {
 	int words[4];
 	int userbits;
 	int motor_num;//CAN bus address
+	int pos;
 	char name[20];
+	int fnum;
 
 } MSTATUS;
 
@@ -33,5 +35,4 @@ int moog_fgoto( int rs485_fd, int can_addr, int fnum );
 int moog_getstatus(int rs485_fd, MSTATUS* stat);
 void print_status(MSTATUS stat);
 int build_stat_structs( int rs485_fd, MSTATUS motors[] );
-
 
