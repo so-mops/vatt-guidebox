@@ -204,13 +204,19 @@ printf("pretending to do telemetry\n");
 	
 	active = atoi(resp);
 
-	for(int num=1; num<9; num++)
+	for(int num=1; num<=7; num++)
 	{
 		if(active & (1<<num))
 		{
 			moog_getstatus(ttyfd, &allmotors[num-1]);
-			print_status( allmotors[ num-1 ] );
+			allmotors[ num-1 ].isActive = 1;
+			//print_status( allmotors[ num-1 ] );
 		}
+		else
+		{
+			allmotors[ num-1 ].isActive = 0;
+		}
+
 	}
 
 }

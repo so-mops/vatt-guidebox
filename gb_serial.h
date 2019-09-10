@@ -19,6 +19,8 @@ typedef struct
 	int pos;
 	char name[20];
 	int fnum;
+	int isActive;
+	int isFilter;
 
 } MSTATUS;
 
