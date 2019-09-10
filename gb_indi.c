@@ -342,6 +342,7 @@ void ISNewSwitch (const char *dev, const char *name, ISState *states, char *name
 			//sp->s = states[0];
 			connectS[0].s = ISS_ON;
 			connectS[1].s = ISS_OFF;
+			connectSP.s = IPS_OK;
 			RS485_FD = ttyOpen(TTYPORT);
 			IDSetSwitch (&connectSP, "Guider is connected.");
 
