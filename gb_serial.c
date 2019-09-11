@@ -259,7 +259,7 @@ int moog_read( int rs485_fd, char resp[] )
 			//printf("%i %c\n", ii, resp[ii]);
 			if(resp[ii] == '\r')
 			{
-				resp[ii] = '\0';
+				resp[ii+1] = '\0';
 				return 0;// finished line
 			}
 			ii++;
@@ -512,10 +512,9 @@ int build_stat_structs( int rs485_fd, MSTATUS motors[] )
 	moog_read(rs485_fd, resp); //flush line
 	int wc;
 	moog_callsub(rs485_fd, 999, -1);
-
+	
 	moog_read( rs485_fd, resp);
 	wc = sscanf(resp, "MOTOR #%i %s", &motors[0].motor_num, motors[0].name );
-	
 
 	moog_read( rs485_fd, resp);
 	wc = sscanf(resp, "MOTOR #%i %s", &motors[1].motor_num, motors[1].name );

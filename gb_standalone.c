@@ -39,7 +39,7 @@ int main(int argc, char ** argv)
 	int doinit=0, dohome=0, domove=0, dohelp=0;
 	int value=0, opt, iaxis, ttyfd, isFilter=0, test;
 	int axisinit=0, portinit=0, valinit=0, dotelem=0;
-
+	char resp[10000];
 	while ((opt = getopt(argc, argv, "p:ihmta:tv:?")) != -1) 
 		{
                	switch (opt) 
