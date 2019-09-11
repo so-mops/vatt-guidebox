@@ -193,6 +193,7 @@ printf("pretending to do telemetry\n");
 	//TODO this should not be called every time
 	//It should be called once at the beginning of the program.
 	build_stat_structs( ttyfd, allmotors );
+
 	moog_write( ttyfd, "RW(12)"  ); //user bits that show which motors are active
 	x=moog_read( ttyfd, resp );
 	if(x>0)
