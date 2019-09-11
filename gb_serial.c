@@ -238,6 +238,22 @@ int moog_write( int rs485_fd, const char *msg )
 	write( rs485_fd, send_buffer, strlen(send_buffer) );
 }
 
+/********************************************************
+ * Name: moog_read
+ * args: rs485_fd-> filedescriptor for serial port
+ *       resp -> pointer to char array to be filled
+ *       with data from the serial port
+ * Descr: Read one line of data from (ending in \n or \r)
+ *          and put that data in the resp char array.
+ *          The serial line is non blocking 
+ *          this function should probably be called
+ *          moog_readline, but alas it is not.
+ * 
+ *
+ * -Scott Swindell September 2019
+ *
+ *
+ * ****************************************************/
 
 int moog_read( int rs485_fd, char resp[] )
 {
@@ -257,7 +273,7 @@ int moog_read( int rs485_fd, char resp[] )
 		{
 			rn = read(rs485_fd, resp+ii, 1);
 			//printf("%i %c\n", ii, resp[ii]);
-			if(resp[ii] == '\r')
+			if(resp[ii] == '\r' || resp[ii] == '\n')
 			{
 				resp[ii+1] = '\0';
 				return 0;// finished line
