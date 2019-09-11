@@ -38,9 +38,18 @@
 #define mydev		"INDI-VATT-GUIDEBOX"
  #define MAIN_GROUP      "Guider Control"                  /* Group name */
  
-  #define POLLMS          250                             /* poll period, ms */
+  #define POLLMS          1000                             /* poll period, ms */
 
 int RS485_FD;
+int inited;
+
+
+static void gbIndiInit();
+static void zeroTelem();
+void guiderProc (void *p);
+
+		
+
 
 // main connection switch
    static ISwitch connectS[] = {
@@ -145,7 +154,7 @@ static INumber ofwNR[] = {{"OFFSET FILTER POSITION","Offset Filter Position", "%
  
 /********Telemetry***********/
         IDDefSwitch (&connectSP, NULL);
-	IDDefText  (&stdTelemTP, NULL);
+//	IDDefText  (&stdTelemTP, NULL);
         
 /***********GOTO*************/
 	IDDefNumber  (&ufwNPR, NULL);
@@ -158,15 +167,15 @@ static INumber ofwNR[] = {{"OFFSET FILTER POSITION","Offset Filter Position", "%
 	
 	IDDefSwitch  (&actionSP, NULL);
 	
-/*	if (!inited)
+	if (!inited)
 	{
-		domeInit();
+		//guiderInit();
 		//sp->s = states[0];
-		connectS[0].s = ISS_ON;
-		connectS[1].s = ISS_OFF;
-		connectDome();
-		IDSetSwitch (&connectSP, "Dome is connected.");
-	}*/
+		//connectS[0].s = ISS_ON;
+		//connectS[1].s = ISS_OFF;
+		//connectDome();
+		IDSetSwitch (&connectSP, "Guider is connected.");
+	}
          
  }
 
@@ -392,7 +401,7 @@ void ISNewSwitch (const char *dev, const char *name, ISState *states, char *name
 			if (sp == &actionS[0]) 
 			{
 				IDMessage(mydev, "Initializing Guider");
-				guider_init( RS485_FD ); 
+				gbIndiInit(  ); 
 			}
 			 
 			/*  home  */ 
@@ -412,6 +421,238 @@ void ISNewSwitch (const char *dev, const char *name, ISState *states, char *name
 	
 	
 }
+
+/*############################################################################
+#  Title: guiderInit
+#  Author: C.Johnson
+#  Date: ???
+#  Args:  N/A
+#  Description: 
+#
+#############################################################################*/
+ static void gbIndiInit()
+ {
+	char buff[40];
+        // int inited=0;              /* set once mountInit is called */
+	guider_init(RS485_FD);
+	
+	 //configure driver to talk with tcs
+	 //configure();
+	
+	//sprintf(NET_ADDR, "%s", DOM_NET_ADDR);
+	//PORT = DOM_PORT;
+	//sprintf(SYSID, "%s", DOM_SYSID);
+	
+	//IDMessage(mydev, "Connecting To  %s:%i using %s / %s",NET_ADDR,PORT,TELID,SYSID);
+	
+         zeroTelem(); // zero telem
+         
+         if (inited)//do not do below functions if already inited
+             return;
+
+	/* start timer to simulate mount motion
+            The timer will call function mountSim after POLLMS milliseconds */
+         IEAddTimer (POLLMS, guiderProc, NULL);
+	
+         inited = 1;
+         
+ }
+
+/*############################################################################
+#  Title: zeroTelem
+#  Author: Chris Johnson
+#  Date: 11/20/12
+#  Args:  N/A
+#  Description: Stuffs all of the telemetry strings with Zero
+#
+#############################################################################*/
+static void zeroTelem()
+ {
+/*        char zerAll[] = "-00.000 00 00 -000.00000 -000.0000000 -000.000000 -000.00000 -000.0000000 -000.0000000 -000.00000 -000.0000000 -000.0000000 -000.00000 00 00";
+	 
+	
+	int  err;
+	double num;
+
+        sscanf(zerAll, "%s %s %s %s %s %s %s %s %s %s %s %s %s %s %s", 
+		stdTelem.del,stdTelem.mod,stdTelem.init,stdTelem.telaz,
+		stdTelem.az,stdTelem.home,stdTelem.cpd,stdTelem.sd,
+		stdTelem.w,stdTelem.sdw,stdTelem.nu,stdTelem.rho,stdTelem.phi,
+		stdTelem.look,stdTelem.hold);
+
+	sprintf(stdTelem.mod, "STOWED");
+
+	IDSetText(&stdTelemTP, NULL);*/
+	
+	
+
+ }
+
+/*############################################################################
+#  Title: guiderTelem
+#  Author: Chris Johnson
+#  Date: 11/20/12
+#  Args:  N/A
+#  Description: Retrieves all of the basic telemetry from the TCS and stores
+#               it locally for display and later use
+#
+#############################################################################*/
+static int guiderTelem()
+ {
+        char ret[121], ret2[121];
+	int  err, ix, isFilter;
+	double num;
+	MSTATUS allmotors[7];
+	INumber *indinum;
+	MSTATUS *mstat;
+
+	memset(allmotors,0,(sizeof(MSTATUS)*7));
+	
+	doTelemetry(RS485_FD, allmotors);
+
+	/*IDDefNumber  (&ufwNPR, NULL);
+	IDDefNumber  (&lfwNPR, NULL);
+	IDDefNumber  (&offxNPR, NULL);
+	IDDefNumber  (&offyNPR, NULL);
+	IDDefNumber  (&offFocNPR, NULL);
+	IDDefNumber  (&offMirrNPR, NULL);
+	IDDefNumber  (&ofwNPR, NULL);*/
+	fprintf(stderr, "in guiderTelem\n");
+	
+	//indinum=NULL;
+	for (ix=0;ix<7;ix++)
+		{
+		//mstat=&allmotors[ix];
+		
+		if(!strcmp(ufwNR[0].name, allmotors[ix].name))
+			{
+			isFilter=1;
+			indinum=&ufwNR[0];
+			break;
+			}
+		else if(!strcmp(lfwNR[0].name, allmotors[ix].name))
+			{
+			isFilter=1;
+			indinum=&lfwNR[0];
+			break;
+			}
+		else if(!strcmp(offxNR[0].name, allmotors[ix].name))
+			{
+			indinum=&offxNR[0];
+			break;
+			}
+		else if(!strcmp(offyNR[0].name, allmotors[ix].name))
+			{
+			indinum=&offyNR[0];
+			break;
+			}
+		else if(!strcmp(offFocNR[0].name, allmotors[ix].name))
+			{
+			indinum=&offFocNR[0];
+			break;
+			}
+		else if(!strcmp(offMirrNR[0].name, allmotors[ix].name))
+			{
+			indinum=&offMirrNR[0];
+			break;
+			}
+		else if(!strcmp(ofwNR[0].name, allmotors[ix].name))
+			{
+			isFilter=1;
+			indinum=&ofwNR[0];
+			break;
+			}
+		else
+			{
+			fprintf(stderr, "no match\n");
+			indinum=NULL;
+			//mstat=NULL;
+			}
+		fprintf(stderr, "ix=%i indiname=%s motorsname=%s\n", ix, indinum->name, allmotors[ix].name);
+		indinum->value = 0;//allmotors[ix].pos;
+		/*if(isFilter)
+			indinum[0].value = 0;//allmotors[ix].fnum;*/
+		
+		}
+		/*IDSetNumber(&offxNPR, NULL);
+            	IDSetNumber(&offyNPR, NULL);
+            	IDSetNumber(&offMirrNPR, NULL);
+            	IDSetNumber(&offFocNPR, NULL);
+            	IDSetNumber(&ofwNPR, NULL);
+            	IDSetNumber(&lfwNPR, NULL);
+            	IDSetNumber(&ufwNPR, NULL);*/
+            	
+
+		
+             
+
+	/*	printf("\tactive=%i\n",allmotors[ix].isActive);
+		for(ix2=0;ix2<4;ix2++)
+			{
+			printf("\t\twords[%i]=%i\n", ix2, allmotors[ix].words[ix2]);
+			}
+		printf("\tuserbits=%i\n", allmotors[ix].userbits);
+		printf("\tmotor_num=%i\n", allmotors[ix].motor_num);
+		printf("\tpos=%i\n", allmotors[ix].pos);
+		printf("\tname=%s\n", allmotors[ix].name);
+		printf("\tfnum=%i\n", allmotors[ix].fnum);*/
+		
+		return 1;
+        
+
+ }
+
+/*############################################################################
+#  Title: guiderProc
+#  Author: E.C. Downey (Hacked by C. Johnson)
+#  Date: 11/20/12
+#  Args:  N/A
+#  Description: 
+#
+#############################################################################*/
+void guiderProc (void *p)
+ {
+         static struct timeval ltv;
+         struct timeval tv;
+         double dt, da, dx, num;
+         int nlocked;
+	fprintf(stderr, "in guider proc\n");
+	/* If telescope is not on, do not query.  just start */
+         if (connectSP.s == IPS_IDLE)
+         {
+                 IEAddTimer (POLLMS, guiderProc, NULL);
+                 return;
+         }
+ 
+	  /* Process per current state.*/
+         switch (connectSP.s)
+         {
+         
+         /* #1 State is idle*/
+         case IPS_IDLE:
+             break;
+ 
+         case IPS_BUSY:
+             break;
+ 
+         case IPS_OK:
+            /********* TELEMETRY HOOK ********/
+		fprintf(stderr, "going to telem\n");
+		
+	     guiderTelem();
+            /*********************************/
+             break;
+ 
+         case IPS_ALERT:
+	     //testConnect();
+             break;
+         }
+ 
+         /* again */
+         IEAddTimer (POLLMS, guiderProc, NULL);
+ }
+ 
+
 
 
 

@@ -189,8 +189,8 @@ int doTelemetry(int ttyfd, MSTATUS *allmotors)
 char resp[200];
 int active, x;
 
-printf("pretending to do telemetry\n");
-	//TODO this should not be called every time
+	memset(allmotors, 0, (sizeof(MSTATUS)*7));
+
 	//It should be called once at the beginning of the program.
 	build_stat_structs( ttyfd, allmotors );
 
