@@ -183,9 +183,9 @@ int ix,ix2;
 		{
 		printf("******Stage %i*******\n", ix);
 		printf("\tactive=%i\n",allmotors[ix].isActive);
-		for(ix2=0;ix2<7;ix2++)
+		for(ix2=0;ix2<4;ix2++)
 			{
-			printf("\twords[%i]=%i\n", ix2, allmotors[ix].words[ix2]);
+			printf("\t\twords[%i]=%i\n", ix2, allmotors[ix].words[ix2]);
 			}
 		printf("\tuserbits=%i\n", allmotors[ix].userbits);
 		printf("\tmotor_num=%i\n", allmotors[ix].motor_num);
