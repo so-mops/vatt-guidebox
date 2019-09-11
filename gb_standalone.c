@@ -177,13 +177,16 @@ void displayTelem(int ttyfd)
 {
 MSTATUS allmotors[7];
 
-int ix;
+int ix,ix2;
 	doTelemetry(ttyfd, allmotors);
 	for(ix=0;ix<7;ix++)
 		{
 		printf("******Stage %i*******\n", ix);
 		printf("\tactive=%i\n",allmotors[ix].isActive);
-		//printf("\twords=%i\n", allmotors[ix].words);
+		for(ix2=0;ix2<7;ix2++)
+			{
+			printf("\twords[%i]=%i\n", ix2, allmotors[ix].words[ix2]);
+			}
 		printf("\tuserbits=%i\n", allmotors[ix].userbits);
 		printf("\tmotor_num=%i\n", allmotors[ix].motor_num);
 		printf("\tpos=%i\n", allmotors[ix].pos);
