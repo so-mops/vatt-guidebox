@@ -97,27 +97,27 @@ ISwitchVectorProperty actionSP      = { mydev, "GUIDE_BOX_ACTIONS", "Guide Box A
 */
 
 //Upper Filter Goto
-static INumber ufwNR[] = {{"FWHEEL_UPPER","Upper Filter", "%i",0., 90., 0., 0., 0, 0, 0}, };
+static INumber ufwNR[] = {{"FWHEEL_UPPER","Upper Filter", "%i",0., 0., 0., 0., 0, 0, 0}, };
 
  static INumberVectorProperty ufwNPR = {  mydev, "FWHEEL_UPPER", "Upper Filter Wheel goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  ufwNR, NARRAY(ufwNR), "", 0};
 
 //Lower Filter Goto
-static INumber lfwNR[] = {{"FWHEEL_LOWER","Lower Filter", "%i",0., 90., 0., 0., 0, 0, 0}, };
+static INumber lfwNR[] = {{"FWHEEL_LOWER","Lower Filter", "%i",0., 0., 0., 0., 0, 0, 0}, };
 
  static INumberVectorProperty lfwNPR = {  mydev, "FWHEEL_LOWER", "Lower Filter Wheel goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  lfwNR, NARRAY(lfwNR), "", 0};
 
 //Offset X Goto
-static INumber offxNR[] = {{"OFFSET_X","Offset X Position", "%i",0., 90., 0., 0., 0, 0, 0}, };
+static INumber offxNR[] = {{"OFFSET_X","Offset X Position", "%i",0., 0., 0., 0., 0, 0, 0}, };
 
  static INumberVectorProperty offxNPR = {  mydev, "OFFSET_X", "offset x goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  offxNR, NARRAY(offxNR), "", 0};
 
 //Offset Y Goto
-static INumber offyNR[] = {{"OFFSET_Y","Offset Y Position", "%i",0., 90., 0., 0., 0, 0, 0}, };
+static INumber offyNR[] = {{"OFFSET_Y","Offset Y Position", "%i",0., 0., 0., 0., 0, 0, 0}, };
 
  static INumberVectorProperty offyNPR = {  mydev, "OFFSET_Y", "offset y goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  offyNR, NARRAY(offyNR), "", 0};
 
 //Offset Focus Goto
-static INumber offFocNR[] = {{"OFFSET_FOCUS","Offset Focus", "%i",0., 90., 0., 0., 0, 0, 0}, };
+static INumber offFocNR[] = {{"OFFSET_FOCUS","Offset Focus", "%i",0., 0., 0., 0., 0, 0, 0}, };
 
  static INumberVectorProperty offFocNPR = {  mydev, "OFFSET_FOCUS", "offset foc goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  offFocNR, NARRAY(offFocNR), "", 0};
 
@@ -533,76 +533,61 @@ static int guiderTelem()
 			{
 			isFilter=1;
 			indinum=&ufwNR[0];
-			break;
+			//break;
 			}
 		else if(!strcmp(lfwNR[0].name, allmotors[ix].name))
 			{
 			isFilter=1;
 			indinum=&lfwNR[0];
-			break;
+			//break;
 			}
 		else if(!strcmp(offxNR[0].name, allmotors[ix].name))
 			{
 			indinum=&offxNR[0];
-			break;
+			//break;
 			}
 		else if(!strcmp(offyNR[0].name, allmotors[ix].name))
 			{
 			indinum=&offyNR[0];
-			break;
+			//break;
 			}
 		else if(!strcmp(offFocNR[0].name, allmotors[ix].name))
 			{
 			indinum=&offFocNR[0];
-			break;
+			//break;
 			}
 		else if(!strcmp(offMirrNR[0].name, allmotors[ix].name))
 			{
 			indinum=&offMirrNR[0];
-			break;
+			//break;
 			}
 		else if(!strcmp(ofwNR[0].name, allmotors[ix].name))
 			{
 			isFilter=1;
 			indinum=&ofwNR[0];
-			break;
+			//break;
 			}
 		else
 			{
 			fprintf(stderr, "no match\n");
 			indinum=NULL;
-			//mstat=NULL;
+			mstat=NULL;
 			}
-		fprintf(stderr, "ix=%i indiname=%s motorsname=%s\n", ix, indinum->name, allmotors[ix].name);
-		indinum->value = 0;//allmotors[ix].pos;
-		/*if(isFilter)
-			indinum[0].value = 0;//allmotors[ix].fnum;*/
+		fprintf(stderr, "ix=%i indiname=%s motorsname=%s\n", ix, indinum->name, allmotors[ix].name );
+		fprintf(stderr, "ix=%i indival=%f motorval=%i\n", ix, indinum->value, allmotors[ix].pos );
+		indinum->value = (double)allmotors[ix].pos;
+		if (isFilter)
+			indinum[0].value = (double)allmotors[ix].fnum;
 		
 		}
-		/*IDSetNumber(&offxNPR, NULL);
-            	IDSetNumber(&offyNPR, NULL);
-            	IDSetNumber(&offMirrNPR, NULL);
-            	IDSetNumber(&offFocNPR, NULL);
-            	IDSetNumber(&ofwNPR, NULL);
-            	IDSetNumber(&lfwNPR, NULL);
-            	IDSetNumber(&ufwNPR, NULL);*/
-            	
-
-		
-             
-
-	/*	printf("\tactive=%i\n",allmotors[ix].isActive);
-		for(ix2=0;ix2<4;ix2++)
-			{
-			printf("\t\twords[%i]=%i\n", ix2, allmotors[ix].words[ix2]);
-			}
-		printf("\tuserbits=%i\n", allmotors[ix].userbits);
-		printf("\tmotor_num=%i\n", allmotors[ix].motor_num);
-		printf("\tpos=%i\n", allmotors[ix].pos);
-		printf("\tname=%s\n", allmotors[ix].name);
-		printf("\tfnum=%i\n", allmotors[ix].fnum);*/
-		
-		return 1;
+		IDSetNumber(&offxNPR, "updated1");
+            	IDSetNumber(&offyNPR, "updated2");
+            	IDSetNumber(&offMirrNPR, "updated3");
+            	IDSetNumber(&offFocNPR, "updated4");
+            	IDSetNumber(&ofwNPR, "updated5");
+            	IDSetNumber(&lfwNPR, "updated6");
+            	IDSetNumber(&ufwNPR, "updated7");
+ 		return 1;
         
 
  }
