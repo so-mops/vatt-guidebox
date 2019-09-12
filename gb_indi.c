@@ -5,7 +5,7 @@
 #  Description:   indi driver for vatt guider box
 #
 #
-#############################################################################*/ 
+#############################################################################*/
 
  /* Standard headers */
  #include <stdio.h>
@@ -97,37 +97,37 @@ ISwitchVectorProperty actionSP      = { mydev, "GUIDE_BOX_ACTIONS", "Guide Box A
 */
 
 //Upper Filter Goto
-static INumber ufwNR[] = {{"UPPER FILTER","Upper Filter", "%i",0., 90., 0., 0., 0, 0, 0}, };
+static INumber ufwNR[] = {{"FWHEEL_UPPER","Upper Filter", "%i",0., 90., 0., 0., 0, 0, 0}, };
 
  static INumberVectorProperty ufwNPR = {  mydev, "FWHEEL_UPPER", "Upper Filter Wheel goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  ufwNR, NARRAY(ufwNR), "", 0};
 
 //Lower Filter Goto
-static INumber lfwNR[] = {{"LOWER FILTER","Lower Filter", "%i",0., 90., 0., 0., 0, 0, 0}, };
+static INumber lfwNR[] = {{"FWHEEL_LOWER","Lower Filter", "%i",0., 90., 0., 0., 0, 0, 0}, };
 
  static INumberVectorProperty lfwNPR = {  mydev, "FWHEEL_LOWER", "Lower Filter Wheel goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  lfwNR, NARRAY(lfwNR), "", 0};
 
 //Offset X Goto
-static INumber offxNR[] = {{"OFFSET X POSITION","Offset X Position", "%i",0., 90., 0., 0., 0, 0, 0}, };
+static INumber offxNR[] = {{"OFFSET_X","Offset X Position", "%i",0., 90., 0., 0., 0, 0, 0}, };
 
  static INumberVectorProperty offxNPR = {  mydev, "OFFSET_X", "offset x goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  offxNR, NARRAY(offxNR), "", 0};
 
 //Offset Y Goto
-static INumber offyNR[] = {{"OFFSET Y POSITION","Offset Y Position", "%i",0., 90., 0., 0., 0, 0, 0}, };
+static INumber offyNR[] = {{"OFFSET_Y","Offset Y Position", "%i",0., 90., 0., 0., 0, 0, 0}, };
 
  static INumberVectorProperty offyNPR = {  mydev, "OFFSET_Y", "offset y goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  offyNR, NARRAY(offyNR), "", 0};
 
 //Offset Focus Goto
-static INumber offFocNR[] = {{"OFFSET FOCUS","Offset Focus", "%i",0., 90., 0., 0., 0, 0, 0}, };
+static INumber offFocNR[] = {{"OFFSET_FOCUS","Offset Focus", "%i",0., 90., 0., 0., 0, 0, 0}, };
 
  static INumberVectorProperty offFocNPR = {  mydev, "OFFSET_FOCUS", "offset foc goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  offFocNR, NARRAY(offFocNR), "", 0};
 
 //Offset Mirror Goto
-static INumber offMirrNR[] = {{"OFFSET MIRROR POSITION","Offset Mirror Position", "%i",0., 90., 0., 0., 0, 0, 0}, };
+static INumber offMirrNR[] = {{"OFFSET_MIRRORS","Offset Mirror Position", "%i",0., 90., 0., 0., 0, 0, 0}, };
 
- static INumberVectorProperty offMirrNPR = {  mydev, "OFFSET_MIRRORS", "offset mirror goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  offMirrNR, NARRAY(offMirrNR), "", 0};
+static INumberVectorProperty offMirrNPR = {  mydev, "OFFSET_MIRRORS", "offset mirror goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  offMirrNR, NARRAY(offMirrNR), "", 0};
 
 //Offset Filter Goto
-static INumber ofwNR[] = {{"OFFSET FILTER POSITION","Offset Filter Position", "%i",0., 90., 0., 0., 0, 0, 0}, };
+static INumber ofwNR[] = {{"OFFSET_FWHEEL","Offset Filter Position", "%i",0., 90., 0., 0., 0, 0, 0}, };
 
  static INumberVectorProperty ofwNPR = {  mydev, "OFFSET_FWHEEL", "offset filter goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  ofwNR, NARRAY(ofwNR), "", 0};
 
@@ -212,11 +212,16 @@ static INumber ofwNR[] = {{"OFFSET FILTER POSITION","Offset Filter Position", "%
              return;
  
 
+		
+	
+	 	 
+
 	if (!strcmp (name, offFocNPR.name)) {
              /* new Focus Position */
              /* Check connectSP, if it is idle, then return */
              if (connectSP.s == IPS_IDLE)
              {
+				 
                  offFocNPR.s = IPS_IDLE;
                  IDSetNumber(&offFocNPR, "Guider is offline.");
                  return;
