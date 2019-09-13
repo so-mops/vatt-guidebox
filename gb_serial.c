@@ -456,8 +456,8 @@ int moog_getstatus(int rs485_fd, MSTATUS* stat)
 	{
 		stat->pos = atoi(resp);
 	}
-
-	snprintf(msg, 10, "f:%i", stat->motor_num);
+	
+	snprintf(msg, 10, "Rf:%i", stat->motor_num);
 	moog_write(rs485_fd, (const char *) msg );
 	if( moog_read(rs485_fd, resp) == 0)
 	{

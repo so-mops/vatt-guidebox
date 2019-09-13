@@ -97,37 +97,37 @@ ISwitchVectorProperty actionSP      = { mydev, "GUIDE_BOX_ACTIONS", "Guide Box A
 */
 
 //Upper Filter Goto
-static INumber ufwNR[] = {{"FWHEEL_UPPER","Upper Filter", "%i",0., 0., 0., 0., 0, 0, 0}, };
+static INumber ufwNR[] = {{"FWHEEL_UPPER","Upper Filter", "%f",0., 0., 0., 0., 0, 0, 0}, };
 
  static INumberVectorProperty ufwNPR = {  mydev, "FWHEEL_UPPER", "Upper Filter Wheel goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  ufwNR, NARRAY(ufwNR), "", 0};
 
 //Lower Filter Goto
-static INumber lfwNR[] = {{"FWHEEL_LOWER","Lower Filter", "%i",0., 0., 0., 0., 0, 0, 0}, };
+static INumber lfwNR[] = {{"FWHEEL_LOWER","Lower Filter", "%f",0., 0., 0., 0., 0, 0, 0}, };
 
  static INumberVectorProperty lfwNPR = {  mydev, "FWHEEL_LOWER", "Lower Filter Wheel goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  lfwNR, NARRAY(lfwNR), "", 0};
 
 //Offset X Goto
-static INumber offxNR[] = {{"OFFSET_X","Offset X Position", "%i",0., 0., 0., 0., 0, 0, 0}, };
+static INumber offxNR[] = {{"OFFSET_X","Offset X Position", "%f",0., 0., 0., 0., 0, 0, 0}, };
 
  static INumberVectorProperty offxNPR = {  mydev, "OFFSET_X", "offset x goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  offxNR, NARRAY(offxNR), "", 0};
 
 //Offset Y Goto
-static INumber offyNR[] = {{"OFFSET_Y","Offset Y Position", "%i",0., 0., 0., 0., 0, 0, 0}, };
+static INumber offyNR[] = {{"OFFSET_Y","Offset Y Position", "%f",0., 0., 0., 0., 0, 0, 0}, };
 
  static INumberVectorProperty offyNPR = {  mydev, "OFFSET_Y", "offset y goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  offyNR, NARRAY(offyNR), "", 0};
 
 //Offset Focus Goto
-static INumber offFocNR[] = {{"OFFSET_FOCUS","Offset Focus", "%i",0., 0., 0., 0., 0, 0, 0}, };
+static INumber offFocNR[] = {{"OFFSET_FOCUS","Offset Focus", "%f",0., 0., 0., 0., 0, 0, 0}, };
 
  static INumberVectorProperty offFocNPR = {  mydev, "OFFSET_FOCUS", "offset foc goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  offFocNR, NARRAY(offFocNR), "", 0};
 
 //Offset Mirror Goto
-static INumber offMirrNR[] = {{"OFFSET_MIRRORS","Offset Mirror Position", "%i",0., 90., 0., 0., 0, 0, 0}, };
+static INumber offMirrNR[] = {{"OFFSET_MIRRORS","Offset Mirror Position", "%f",0., 90., 0., 0., 0, 0, 0}, };
 
 static INumberVectorProperty offMirrNPR = {  mydev, "OFFSET_MIRRORS", "offset mirror goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  offMirrNR, NARRAY(offMirrNR), "", 0};
 
 //Offset Filter Goto
-static INumber ofwNR[] = {{"OFFSET_FWHEEL","Offset Filter Position", "%i",0., 90., 0., 0., 0, 0, 0}, };
+static INumber ofwNR[] = {{"OFFSET_FWHEEL","Offset Filter Position", "%f",0., 90., 0., 0., 0, 0, 0}, };
 
  static INumberVectorProperty ofwNPR = {  mydev, "OFFSET_FWHEEL", "offset filter goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  ofwNR, NARRAY(ofwNR), "", 0};
 
@@ -522,9 +522,25 @@ static int guiderTelem()
 	IDDefNumber  (&offFocNPR, NULL);
 	IDDefNumber  (&offMirrNPR, NULL);
 	IDDefNumber  (&ofwNPR, NULL);*/
-	fprintf(stderr, "in guiderTelem\n");
-	
+	lfwNR[0].value = (double) allmotors[5].fnum;
+	ufwNR[0].value = (double) allmotors[6].fnum;
+	ofwNR[0].value = (double) allmotors[4].fnum;
+
+	offFocNR[0].value = (double) allmotors[2].pos;
+	offxNR[0].value = (double) allmotors[0].pos;
+	offyNR[0].value = (double) allmotors[1].pos;
+	offMirrNR[0].value = (double) allmotors[3].pos;
+	IDSetNumber(&offxNPR, NULL);
+	IDSetNumber(&offyNPR, "updating %i", allmotors[3].pos);
+	IDSetNumber(&offMirrNPR, NULL);
+	IDSetNumber(&offFocNPR, NULL);
+	IDSetNumber(&ofwNPR, NULL);
+	IDSetNumber(&lfwNPR, NULL);
+	IDSetNumber(&ufwNPR, NULL);
+
+	fprintf(stderr, "in guiderTelem %i\n", allmotors[5].fnum );
 	//indinum=NULL;
+	/*
 	for (ix=0;ix<7;ix++)
 		{
 		//mstat=&allmotors[ix];
@@ -532,13 +548,13 @@ static int guiderTelem()
 		if(!strcmp(ufwNR[0].name, allmotors[ix].name))
 			{
 			isFilter=1;
-			indinum=&ufwNR[0];
+			ufwNR[0].value = allmotors[ix].fnum;
 			//break;
 			}
 		else if(!strcmp(lfwNR[0].name, allmotors[ix].name))
 			{
 			isFilter=1;
-			indinum=&lfwNR[0];
+			//lfwNR[0].value = allmotors[ix].fnum;
 			//break;
 			}
 		else if(!strcmp(offxNR[0].name, allmotors[ix].name))
@@ -580,13 +596,15 @@ static int guiderTelem()
 			indinum[0].value = (double)allmotors[ix].fnum;
 		
 		}
-		IDSetNumber(&offxNPR, "updated1");
-            	IDSetNumber(&offyNPR, "updated2");
-            	IDSetNumber(&offMirrNPR, "updated3");
-            	IDSetNumber(&offFocNPR, "updated4");
-            	IDSetNumber(&ofwNPR, "updated5");
-            	IDSetNumber(&lfwNPR, "updated6");
-            	IDSetNumber(&ufwNPR, "updated7");
+		
+		IDSetNumber(&offxNPR, NULL);
+            	IDSetNumber(&offyNPR, NULL);
+            	IDSetNumber(&offMirrNPR, NULL);
+            	IDSetNumber(&offFocNPR, NULL);
+            	IDSetNumber(&ofwNPR, NULL);
+            	IDSetNumber(&lfwNPR, NULL);
+            	IDSetNumber(&ufwNPR, NULL);
+				*/
  		return 1;
         
 
