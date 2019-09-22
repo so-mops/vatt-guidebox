@@ -11,7 +11,7 @@
 #include "gb_serial.h"
 
 #define error_message printf
-
+#define NMOTORS 7
 const char * STATUS_CODES[4][16] = {
 	{
 		"Drive Ready",
@@ -182,7 +182,6 @@ int open_port( char usbport[] )
 
 	char serialfix = 128;
 
-
 	/*fd = open(usbport, O_RDWR | O_NOCTTY | O_NDELAY);
 	fcntl(fd, F_SETFL, FNDELAY);
 	if (fd == -1)
@@ -207,7 +206,6 @@ int open_port( char usbport[] )
 	set_blocking (fd, 0);                // set no blocking
 	
   // this is necessary, not sure why.
-	write (fd, &serialfix, 1);           // send 1 character greeting
 
 	
 	
@@ -324,6 +322,7 @@ int moog_init(int rs485_fd )
 
 	moog_write(rs485_fd, "Z:0"); //reset all nodes
 	sleep(1);
+	moog_write(rs485_fd, "ddd=0" ); // Turn debug off
 	moog_write(rs485_fd, "GOSUB(0)" ); // start head node
 	usleep(200000);
 
@@ -344,7 +343,7 @@ int moog_init(int rs485_fd )
  * Description:
  * 		Send a home command to a motor. For the 
  * 		linear stages this is the subroutine
- * 		100 for the filter wheels it is 
+ * 		100  for the filter wheels it is 
  * 		101. 
  *
  *
@@ -353,10 +352,13 @@ int moog_home( int rs485_fd, int can_addr )
 {
 	switch(can_addr)
 	{
+		case -1: //Home all in series
+			 moog_callsub( rs485_fd, 100, can_addr );
 		case OFFSET_X:
 		case OFFSET_Y:
 		case OFFSET_FOCUS:
-			moog_callsub( rs485_fd, 100, can_addr );
+		case OFFSET_MIRRORS:
+			moog_callsub( rs485_fd, 102, can_addr );
 		break;
 		default:
 			printf("Motor %i can not be homed yet", can_addr);
@@ -444,37 +446,102 @@ int moog_fgoto( int rs485_fd, int can_addr, int fnum )
  * ***************************/
 int moog_getstatus(int rs485_fd, MSTATUS* stat)
 {
-	char msg[10];
+	char msg[20];
 	char resp[READSIZE];
 	int error;
 
 	moog_read(rs485_fd, resp);//flush--probably unecessary
 
-	snprintf(msg, 10, "RPA:%i", stat->motor_num);
+	snprintf(msg, 20, "RPA:%i", stat->motor_num);
 	moog_write(rs485_fd, (const char *) msg );
 	if( moog_read(rs485_fd, resp) == 0)
 	{
 		stat->pos = atoi(resp);
 	}
+	else
+		return -1;
 	
-	snprintf(msg, 10, "Rf:%i", stat->motor_num);
+	snprintf(msg, 20, "Rf:%i", stat->motor_num);
 	moog_write(rs485_fd, (const char *) msg );
 	if( moog_read(rs485_fd, resp) == 0)
 	{
 		stat->fnum = atoi(resp);
 	}
+	else
+		return -1;
 
 	for(int ii=0; ii<4; ii++)
 	{
-		snprintf( msg, 10, "RW(%i):%i", ii, stat->motor_num );
+		snprintf( msg, 20, "RW(%i):%i", ii, stat->motor_num );
 		moog_write( rs485_fd, (const char *) msg );
 		error = moog_read(rs485_fd, resp);
 		stat->words[ii] = atoi(resp);
 
 	}
-	
+	snprintf( msg, 20, "RB(12,0):%i", stat->motor_num );
+	moog_write(rs485_fd, (const char *) msg );
+	if( moog_read(rs485_fd, resp) == 0)
+    {
+		fprintf(stderr, "%s has a homed status of %s\n", stat->name, resp);
+        stat->isHomed = atoi(resp);
+    }
+	else
+	{
+		fprintf(stderr, "Could not determine homed status of %s check msg %s\n", stat->name, msg);
+		return -1;
+	}
+
+	switch(stat->motor_num)
+	{
+		case OFFSET_FWHEEL:
+			stat->isFilter = 1;
+		break;	
+		case FWHEEL_LOWER:
+			stat->isFilter = 1;
+		break;
+		case FWHEEL_UPPER:
+			stat->isFilter = 1;
+		break;
+		default:
+			stat->isFilter = 0;
+
+	}
+	return 0;
 }
 
+
+int moog_getallstatus(int rs485_fd, MSTATUS stat[])
+{
+	int active;
+	char msg[10];
+	char resp[READSIZE];
+	snprintf(msg, 10, "RW(12)");
+	moog_write(rs485_fd, (const char *) msg );
+	if( moog_read(rs485_fd, resp) == 0)
+	{
+		active = atoi(resp);
+	}
+	else
+	{
+		fprintf(stderr, "WE could not get active status\n");
+		return -1;
+	}
+
+	for(MSTATUS *motor=stat; motor!=stat+NMOTORS; motor++)
+	{
+		
+		
+		if((1<<motor->motor_num) & active)
+		{
+			//TODO error check this response.
+			moog_getstatus(rs485_fd, motor);
+			motor->isActive = 1;
+		}
+		else
+			motor->isActive = 0;
+	
+	}
+}
 
 /**********************************
  * Name: print_status

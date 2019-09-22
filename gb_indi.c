@@ -36,7 +36,8 @@
 #define TTYPORT "/dev/ttyUSB0"
 
 #define mydev		"INDI-VATT-GUIDEBOX"
- #define MAIN_GROUP      "Guider Control"                  /* Group name */
+#define MAIN_GROUP	"Guider Control"                  /* Group name */
+#define ENG_GROUP	"Engineering"
  
   #define POLLMS          1000                             /* poll period, ms */
 
@@ -47,9 +48,9 @@ int inited;
 static void gbIndiInit();
 static void zeroTelem();
 void guiderProc (void *p);
-
+void buildMStatusString(MSTATUS *, char *);
 		
-
+char ttyPORT[20];
 
 // main connection switch
    static ISwitch connectS[] = {
@@ -73,9 +74,23 @@ static IText stdTelemT[] = {{"foc", "Focus Position "       , stdTelem.offfoc, 0
 			
 static ITextVectorProperty stdTelemTP = {  mydev, "stTELEM", "Guider Telemetry",  MAIN_GROUP , IP_RO, 0, IPS_IDLE,  stdTelemT, NARRAY(stdTelemT), "", 0};
 
+static IText ttyPortT[] =  {{"TTYport", "TTY Port", "/dev/ttyUSB0", 0, 0, 0}};
+static ITextVectorProperty ttyPortTP = {  mydev, "COM", "Guider Communication",  ENG_GROUP , IP_RW, 0, IPS_IDLE,  ttyPortT, NARRAY(ttyPortT), "", 0};
 
-		
+static IText motorStatusT[] = {
+	{"M1", "Motor 1", "", 0, 0, 0},
+	{"M2", "Motor 2", "", 0, 0, 0},
+	{"M3", "Motor 3", "", 0, 0, 0},
+	{"M4", "Motor 4", "", 0, 0, 0},
+	{"M5", "Motor 5", "", 0, 0, 0},
+	{"M6", "Motor 6", "", 0, 0, 0},
+	{"M7", "Motor 7", "", 0, 0, 0},
+};
+static ITextVectorProperty motorStatusTP = { mydev, "MSTATUS", "Motor Status", ENG_GROUP, IP_RO, 0, IPS_IDLE, motorStatusT, NARRAY(motorStatusT), "", 0};
 
+
+static ISwitch engSwitchsS[] = {{"SLIMITS", "FIND SOFT LIMITS", ISS_OFF, NULL, 0}};
+static ISwitchVectorProperty engSwitchSP = {mydev, "Switches", "Switches", ENG_GROUP, IP_RW, ISR_NOFMANY, 0, IPS_IDLE, engSwitchsS, NARRAY(engSwitchsS), "", 0};
 
 /************************************************
 Group:  MAIN
@@ -99,7 +114,7 @@ ISwitchVectorProperty actionSP      = { mydev, "GUIDE_BOX_ACTIONS", "Guide Box A
 //Upper Filter Goto
 static INumber ufwNR[] = {{"FWHEEL_UPPER","Upper Filter", "%f",0., 0., 0., 0., 0, 0, 0}, };
 
- static INumberVectorProperty ufwNPR = {  mydev, "FWHEEL_UPPER", "Upper Filter Wheel goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  ufwNR, NARRAY(ufwNR), "", 0};
+ static INumberVectorProperty ufwNPR = {  mydev, "FWHEEL_UPPER", "Upper Filter Wheel goto",  MAIN_GROUP , IP_RW, 0, IPS_OK,  ufwNR, NARRAY(ufwNR), "", 0};
 
 //Lower Filter Goto
 static INumber lfwNR[] = {{"FWHEEL_LOWER","Lower Filter", "%f",0., 0., 0., 0., 0, 0, 0}, };
@@ -154,6 +169,9 @@ static INumber ofwNR[] = {{"OFFSET_FWHEEL","Offset Filter Position", "%f",0., 90
  
 /********Telemetry***********/
         IDDefSwitch (&connectSP, NULL);
+        IDDefSwitch (&engSwitchSP, NULL);
+		IDDefText(&ttyPortTP, NULL);
+		IDDefText(&motorStatusTP, NULL);
 //	IDDefText  (&stdTelemTP, NULL);
         
 /***********GOTO*************/
@@ -191,6 +209,30 @@ static INumber ofwNR[] = {{"OFFSET_FWHEEL","Offset Filter Position", "%f",0., 90
 #############################################################################*/
  void ISNewText (const char *dev, const char *name, char *texts[], char *names[], int n)
  {
+	IDMessage(mydev, "ISNewText called [%s], %li", texts[0], sizeof(texts[0]));
+	char septext[30];
+	if( !strcmp(name, "COM") )
+	{
+		
+		/*After trying for hours this is the only way 
+		I cant seem to update a TP 
+		IUUpdate, IUSaveText, strcpy, strncpy 
+		so instead we point text member to texts[0]
+		and update a global variable like a chump.
+		*/
+		IText *tp = IUFindText( &ttyPortTP, names[0] );
+		tp->text = texts[0];
+		strcpy(ttyPORT, texts[0]);
+
+		//tp->text[1] = 'U';
+		//tp->text[2] = 'C';
+		//tp->text[3] = 'K';
+		//tp->text[4] = ' ';
+		//tp->text[5] = 'M';
+		//tp->text[6] = 'E';
+		//tp->text[7] = '\0';
+		IDSetText(&ttyPortTP, "Changing port to [%s]", ttyPortT[0].text);
+	}
  	return;
  }
 
@@ -371,9 +413,23 @@ void ISNewSwitch (const char *dev, const char *name, ISState *states, char *name
 			//sp->s = states[0];
 			connectS[0].s = ISS_ON;
 			connectS[1].s = ISS_OFF;
-			connectSP.s = IPS_OK;
-			RS485_FD = ttyOpen(TTYPORT);
-			IDSetSwitch (&connectSP, "Guider is connected.");
+			RS485_FD = ttyOpen(ttyPORT);
+			if (RS485_FD > 0)
+			{
+				connectS[0].s = ISS_ON;
+				connectS[1].s = ISS_OFF;
+				connectSP.s = IPS_OK;
+				IDSetSwitch (&connectSP, "Guider is connected.");
+			}
+			else
+			{
+				connectS[0].s = ISS_OFF;
+				connectS[1].s = ISS_ON;
+				connectSP.s = IPS_ALERT;
+				IDSetSwitch (&connectSP, "Could Not connect to guider on port %s %p", ttyPORT, ttyPortT[0].text);
+			}
+					
+
 
 		}
 		else
@@ -412,6 +468,7 @@ void ISNewSwitch (const char *dev, const char *name, ISState *states, char *name
 			/*  home  */ 
 			else if (sp == &actionS[1]) 
 			{
+				stageHome(RS485_FD, NULL);
 				IDMessage(mydev, "Homing Guider");
 				  
 			}
@@ -421,6 +478,10 @@ void ISNewSwitch (const char *dev, const char *name, ISState *states, char *name
 			IUResetSwitch(&actionSP);
 	 
 		} /* end for */
+	}
+	else if(!strcmp(name, engSwitchSP.name))
+	{
+
 	}
 
 	
@@ -440,6 +501,7 @@ void ISNewSwitch (const char *dev, const char *name, ISState *states, char *name
 	char buff[40];
         // int inited=0;              /* set once mountInit is called */
 	guider_init(RS485_FD);
+	int init_struct =1;
 	
 	 //configure driver to talk with tcs
 	 //configure();
@@ -457,7 +519,7 @@ void ISNewSwitch (const char *dev, const char *name, ISState *states, char *name
 
 	/* start timer to simulate mount motion
             The timer will call function mountSim after POLLMS milliseconds */
-         IEAddTimer (POLLMS, guiderProc, NULL);
+         IEAddTimer (POLLMS, guiderProc, &init_struct);
 	
          inited = 1;
          
@@ -493,6 +555,56 @@ static void zeroTelem()
 
  }
 
+
+/*############################################################################
+#  Title: motor2nvp
+#  Author: Scott Swindell
+#  Date: 9/20/19
+#  Args:  motor-> pointer to motor status struct to match with the name
+#  Description: 
+#		Return the NVP of the corresponding motor name.
+#############################################################################*/
+
+static INumberVectorProperty *motor2nvp(MSTATUS *motor)
+{
+	INumberVectorProperty *NVP;
+	if(strcmp( motor->name,  "OFFSET_X") == 0)
+	{
+		NVP = &offxNPR;
+	}	
+	else if(strcmp( motor->name,  "OFFSET_Y") == 0)
+	{
+		NVP = &offyNPR;
+	}	
+	else if(strcmp( motor->name,  "OFFSET_FOCUS") == 0)
+	{
+		NVP = &offFocNPR;
+	}
+	else if(strcmp( motor->name,  "OFFSET_MIRRORS") == 0)
+	{
+		NVP = &offMirrNPR;
+	}
+	else if(strcmp( motor->name,  "OFFSET_FWHEEL") == 0)
+	{
+		NVP = &ofwNPR;
+	}
+	else if(strcmp( motor->name,  "FWHEEL_UPPER") == 0)
+	{
+		NVP = &ufwNPR;
+	}
+	else if(strcmp( motor->name,  "FWHEEL_LOWER") == 0)
+	{
+		NVP = &lfwNPR;
+	}
+	else
+	{
+		NVP = NULL;
+	}
+	
+	return NVP;
+
+}
+
 /*############################################################################
 #  Title: guiderTelem
 #  Author: Chris Johnson
@@ -502,19 +614,60 @@ static void zeroTelem()
 #               it locally for display and later use
 #
 #############################################################################*/
-static int guiderTelem()
+static int guiderTelem(int init_struct)
  {
-        char ret[121], ret2[121];
-	int  err, ix, isFilter;
+        char ret[121], ret2[121], guiderResponse[300], mname[30], statusString[7][1000];
+		
+	int  err, ix, isFilter, active;
 	double num;
-	MSTATUS allmotors[7];
+	static MSTATUS allmotors[7];
 	INumber *indinum;
+	IText * tp;
 	MSTATUS *mstat;
-
-	memset(allmotors,0,(sizeof(MSTATUS)*7));
+	INumberVectorProperty *pNVP;
 	
-	doTelemetry(RS485_FD, allmotors);
+	if( init_struct )
+		memset(allmotors,0,(sizeof(MSTATUS)*7));
+	
 
+	active = doTelemetry(RS485_FD, allmotors, init_struct);
+	if(init_struct)
+	{
+		for(int ii=0; ii<7; ii++)
+			if (allmotors[ii].isActive)
+				IDMessage(mydev, "%i %s is active", ii, allmotors[ii].name);
+			else
+				IDMessage(mydev, "%i %s is NOT active", ii, allmotors[ii].name);
+	}
+	for(MSTATUS *motor=allmotors; motor!=allmotors+7; motor++)
+	{
+		pNVP = motor2nvp(motor);
+		if(pNVP == NULL)
+		{
+			IDMessage(mydev, "Bad motor!");
+			continue;
+		}
+		if ( motor->isActive )
+		{
+			IDMessage(mydev, "%s homed state is %i", motor->name, motor->isHomed);
+			if(motor->isHomed)
+				pNVP->s = IPS_OK;
+			else
+				pNVP->s = IPS_IDLE;
+			pNVP->np[0].value = motor->pos;
+
+		}
+		else
+			pNVP->s = IPS_ALERT;
+
+		snprintf(mname, 30, "M%i", motor->motor_num);
+		strcpy(statusString[motor->motor_num-1], "");
+		buildMStatusString(motor, statusString[motor->motor_num-1]);
+		
+		motorStatusT[motor->motor_num-1].text = statusString[motor->motor_num-1] ;
+		IDSetNumber(pNVP, NULL);
+		IDSetText(&motorStatusTP, NULL);
+	}
 	/*IDDefNumber  (&ufwNPR, NULL);
 	IDDefNumber  (&lfwNPR, NULL);
 	IDDefNumber  (&offxNPR, NULL);
@@ -522,23 +675,26 @@ static int guiderTelem()
 	IDDefNumber  (&offFocNPR, NULL);
 	IDDefNumber  (&offMirrNPR, NULL);
 	IDDefNumber  (&ofwNPR, NULL);*/
+
+	
 	lfwNR[0].value = (double) allmotors[5].fnum;
 	ufwNR[0].value = (double) allmotors[6].fnum;
 	ofwNR[0].value = (double) allmotors[4].fnum;
+
 
 	offFocNR[0].value = (double) allmotors[2].pos;
 	offxNR[0].value = (double) allmotors[0].pos;
 	offyNR[0].value = (double) allmotors[1].pos;
 	offMirrNR[0].value = (double) allmotors[3].pos;
 	IDSetNumber(&offxNPR, NULL);
-	IDSetNumber(&offyNPR, "updating %i", allmotors[3].pos);
+	IDSetNumber(&offyNPR, NULL);
 	IDSetNumber(&offMirrNPR, NULL);
 	IDSetNumber(&offFocNPR, NULL);
 	IDSetNumber(&ofwNPR, NULL);
 	IDSetNumber(&lfwNPR, NULL);
 	IDSetNumber(&ufwNPR, NULL);
 
-	fprintf(stderr, "in guiderTelem %i\n", allmotors[5].fnum );
+	fprintf(stderr, "in guiderTelem %s\n", allmotors[5].name );
 	//indinum=NULL;
 	/*
 	for (ix=0;ix<7;ix++)
@@ -624,6 +780,16 @@ void guiderProc (void *p)
          struct timeval tv;
          double dt, da, dx, num;
          int nlocked;
+		 int init_struct;
+
+    if(p != NULL)// we only need to init the allmotors struct once.
+	{
+		IDMessage(mydev, "INITING STRUCT");
+		init_struct=1;
+	}
+	else
+		init_struct=0;
+
 	fprintf(stderr, "in guider proc\n");
 	/* If telescope is not on, do not query.  just start */
          if (connectSP.s == IPS_IDLE)
@@ -647,7 +813,7 @@ void guiderProc (void *p)
             /********* TELEMETRY HOOK ********/
 		fprintf(stderr, "going to telem\n");
 		
-	     guiderTelem();
+	     guiderTelem(init_struct);
             /*********************************/
              break;
  
@@ -663,8 +829,29 @@ void guiderProc (void *p)
 
 
 
+ 
+void buildMStatusString(MSTATUS *motor, char mstring[])
+{
+	char dummy[100];
+	snprintf(dummy, 50, "%s(%i)", motor->name, motor->motor_num);
+	strcat(mstring, dummy );
+	
+	if(motor->isActive)
+	{
+		snprintf(dummy, 30, "Encoder Pos:%i", motor->pos);
+		strcat(mstring, dummy);
+		if(motor->isFilter)
+			snprintf(dummy, 20, "Filter Number:%i", motor->fnum);
+		strcat(mstring, dummy);
 
-
+	}
+	else
+	{
+		strcat(mstring, "Not Active!");
+	}
+	
+	
+}
 
 
 

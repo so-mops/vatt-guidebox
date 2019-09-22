@@ -21,6 +21,7 @@ typedef struct
 	int fnum;
 	int isActive;
 	int isFilter;
+	int isHomed;
 
 
 } MSTATUS;
@@ -36,6 +37,7 @@ int moog_home( int rs485_fd, int can_addr );
 int moog_lgoto(int rs485_fd, int can_addr, int pos );
 int moog_fgoto( int rs485_fd, int can_addr, int fnum );
 int moog_getstatus(int rs485_fd, MSTATUS* stat);
+int moog_getallstatus(int rs485_fd, MSTATUS* stat);
 void print_status(MSTATUS stat);
 int build_stat_structs( int rs485_fd, MSTATUS motors[] );
 

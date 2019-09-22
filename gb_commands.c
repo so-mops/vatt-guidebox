@@ -33,7 +33,11 @@
 #
 #############################################################################*/
  int stageHome (int ttyfd, char *stage)
- { 
+ {
+ if (stage == NULL)
+ {
+	 moog_home(ttyfd, -1);
+ } 
  return 1;
       
  }
@@ -73,6 +77,21 @@
         	
  }
 
+/*############################################################################
+#  Title: guiderRead
+#  Author: Scott Swindell
+#  Date: 9/20/19
+#  Returns: 0 on success -1 if there is nothing to read.
+#  Args:  int ttyfd -> tty port file descriptor
+#		resp -> response to be filled on read
+#  Description: closes the ttyport referred to by the file descriptor ttyfd
+#
+#############################################################################*/
+
+ int guiderRead(int ttyfd, char * resp)
+ {
+ 	return moog_read(ttyfd, resp);
+ }
 
 
 /*############################################################################
@@ -184,38 +203,21 @@ return iaxis;
 #	example routine.
 #
 #############################################################################*/
-int doTelemetry(int ttyfd, MSTATUS *allmotors)
+int doTelemetry(int ttyfd, MSTATUS *allmotors, int init_struct)
 {
 char resp[200];
 int active, x;
 
-	memset(allmotors, 0, (sizeof(MSTATUS)*7));
 
 	//It should be called once at the beginning of the program.
-	build_stat_structs( ttyfd, allmotors );
-
-	moog_write( ttyfd, "RW(12)"  ); //user bits that show which motors are active
-	x=moog_read( ttyfd, resp );
-	if(x>0)
-		printf("moog_response = %s\n", resp);
-	else
-		printf("no_response\n");
-	
-	active = atoi(resp);
-
-	for(int num=1; num<=7; num++)
+	if(init_struct)
 	{
-		if(active & (1<<num))
-		{
-			moog_getstatus(ttyfd, &allmotors[num-1]);
-			allmotors[ num-1 ].isActive = 1;
-			//print_status( allmotors[ num-1 ] );
-		}
-		else
-		{
-			allmotors[ num-1 ].isActive = 0;
-		}
-
+		fprintf(stderr, "starting build_stat_structs");
+		build_stat_structs( ttyfd, allmotors );
 	}
 
+	
+	moog_getallstatus(ttyfd, allmotors);
+	
+	
 }
