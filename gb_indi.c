@@ -731,8 +731,10 @@ static int guiderTelem(int init_struct)
 			else
 				pNVP->s = IPS_IDLE;
 			pNVP->np[0].value = motor->pos;
-
-			switch( motor->motor_num )
+			IDMessage(mydev, "motor_num is %i", motor->motor_num);
+			statusLight = indi_motors[motor->motor_num-1].word0L;
+			statusLightVP = &indi_motors[motor->motor_num-1].word0LP;
+	/*		switch( motor->motor_num )
 			{
 				case 1:
 					statusLight = indi_motors[0].word0L;
@@ -746,7 +748,7 @@ static int guiderTelem(int init_struct)
 					statusLight = NULL;
 					statusLightVP = NULL;
 			}
-
+				*/
 			if(statusLight != NULL)
 			{
 				for(int sbit=0; sbit<16; sbit++)
@@ -756,6 +758,7 @@ static int guiderTelem(int init_struct)
 					//IDMessage(mydev, "MOTOR 2 your up, checking bit %i %i %i",sbit, motor->words[0] & (1<<sbit), motor->words[0] );
 					if(motor->words[0] & (1<<sbit))
 					{
+						IDMessage(mydev, "%i %i %i", sbit, motor->words[0], motor->words[0] & (1<<sbit));
 						statusLight[sbit].s = IPS_ALERT;
 					}
 					else
@@ -981,8 +984,7 @@ static void fillMotors()
 	char code[23];
 	int motor_num = 1;
 	fprintf(stderr, "FILLING THE MOTORS\n");
-	const char * STATUS_CODES[4][16] = {
-		{
+	const char * STATUS_CODES[16] = {
 			"Drive Ready",
 			"Bo: Motor is off (indicator)",
 			"Bt: Trajectory in progress (indicator)",
@@ -999,7 +1001,9 @@ static void fillMotors()
 			"Historical Left Limit (- or Negative)",
 			"Right ( + or Positive) Limit Asserted",
 			"Left Limit ( - or Negative) Asserted",
-		},
+		};
+
+	const char * STATUS_CODES_W1[16] =
 		{
 			"Rise Capture Encoder(0) Armed",
 			"Fall Capture Encoder(0) Armed",
@@ -1017,8 +1021,7 @@ static void fillMotors()
 			"Historical negative software over travel limit",
 			"Real time positive soft limit (indicator)",
 			"Real time negative soft limit (indicator)",
-		}
-	};
+		};
 	
 	for(INDIMOTOR *imotor=indi_motors; imotor!=indi_motors+7; imotor++)
 	{
@@ -1033,13 +1036,29 @@ static void fillMotors()
 		for(int code_num=0; code_num<16; code_num++)
 		{
 			snprintf(name, 20, "BIT%i", code_num);
-			strncpy(code, STATUS_CODES[0][code_num], 20);
-			if( sizeof(STATUS_CODES[0][code_num]) > 20 )
+			strncpy(code, STATUS_CODES[code_num], 20);
+			if( sizeof(STATUS_CODES[code_num]) > 20 )
 				strcat(code, "...");
-			IUFillLight(imotor->word0L+code_num, name, STATUS_CODES[0][code_num], IPS_IDLE);
+			IUFillLight(imotor->word0L+code_num, name, STATUS_CODES[code_num], IPS_IDLE);
 		}
-		motor_num++;
+
 		IDDefLight(&imotor->word0LP, NULL);
+		snprintf(label, 20, "Motor %i Word 1", motor_num );
+		snprintf(name, 20, "M%iW1", motor_num);
+		IUFillLightVector(&imotor->word1LP, imotor->word1L, NARRAY(imotor->word1L), mydev, (const char *) name, (const char *) label, group, IPS_IDLE );
+
+		for(int code_num=0; code_num<16; code_num++)
+		{
+			snprintf(name, 20, "BIT%i", code_num);
+			strncpy(code, STATUS_CODES[code_num], 20);
+
+			if(sizeof(STATUS_CODES[code_num]) > 20)
+				strcat(code, "...");
+			IUFillLight(imotor->word1L+code_num, name, STATUS_CODES[code_num], IPS_IDLE);
+		}
+		IDDefLight(&imotor->word1LP, NULL);
+
+		motor_num++;
 
 	}
 }
