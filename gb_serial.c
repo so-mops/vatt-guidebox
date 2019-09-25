@@ -478,18 +478,33 @@ int moog_getstatus(int rs485_fd, MSTATUS* stat)
 		stat->words[ii] = atoi(resp);
 
 	}
-	snprintf( msg, 20, "RB(12,0):%i", stat->motor_num );
+
+	snprintf( msg, 20, "RW(16):%i", stat->motor_num );
 	moog_write(rs485_fd, (const char *) msg );
 	if( moog_read(rs485_fd, resp) == 0)
     {
-		fprintf(stderr, "%s has a homed status of %s\n", stat->name, resp);
-        stat->isHomed = atoi(resp);
+		stat->iobits = atoi(resp);
     }
 	else
 	{
 		fprintf(stderr, "Could not determine homed status of %s check msg %s\n", stat->name, msg);
 		return -1;
 	}
+
+
+	snprintf( msg, 20, "RW(12):%i", stat->motor_num );
+	moog_write(rs485_fd, (const char *) msg );
+	if( moog_read(rs485_fd, resp) == 0)
+    {
+		stat->userbits = atoi(resp);
+        stat->isHomed = stat->iobits & 1;
+    }
+	else
+	{
+		fprintf(stderr, "Could not determine homed status of %s check msg %s\n", stat->name, msg);
+		return -1;
+	}
+
 
 	switch(stat->motor_num)
 	{
@@ -541,6 +556,7 @@ int moog_getallstatus(int rs485_fd, MSTATUS stat[])
 			motor->isActive = 0;
 	
 	}
+	return active;
 }
 
 /**********************************

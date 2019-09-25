@@ -178,7 +178,7 @@ void displayTelem(int ttyfd)
 MSTATUS allmotors[7];
 
 int ix,ix2;
-	doTelemetry(ttyfd, allmotors);
+	doTelemetry(ttyfd, allmotors, 1);
 	for(ix=0;ix<7;ix++)
 		{
 		printf("******Stage %i*******\n", ix);
@@ -193,7 +193,7 @@ int ix,ix2;
 		printf("\tname=%s\n", allmotors[ix].name);
 		printf("\tfnum=%i\n", allmotors[ix].fnum);
 		}
-	
+		
 		
 }
 

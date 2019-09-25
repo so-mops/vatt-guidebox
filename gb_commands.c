@@ -217,7 +217,7 @@ int active, x;
 	}
 
 	
-	moog_getallstatus(ttyfd, allmotors);
+	return moog_getallstatus(ttyfd, allmotors);
 	
 	
 }

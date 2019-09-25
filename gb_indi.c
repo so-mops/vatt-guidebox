@@ -49,6 +49,8 @@
 #
   #define POLLMS          1000                             /* poll period, ms */
 
+
+
 int RS485_FD;
 int inited;
 
@@ -67,7 +69,7 @@ static ISwitch connectS[] = {
 	   {"CONNECT",  "Connect",  ISS_OFF, 0, 0}
      //{"CONNECT",  "On",  ISS_OFF, 0, 0}, {"DISCONNECT", "Off", ISS_ON, 0, 0}
 	 };
-static ISwitchVectorProperty connectSP = { mydev, "CONNECTION", "Connection",  MAIN_GROUP, IP_RW, ISR_ATMOST1, 0, IPS_IDLE,  connectS, NARRAY(connectS), "", 0 };
+static ISwitchVectorProperty connectSP = { mydev, "CONNECTION", "Connection",  MAIN_GROUP, IP_RW, ISR_NOFMANY, 0, IPS_IDLE,  connectS, NARRAY(connectS), "", 0 };
  
 
 //***Guider Telemetry Data***
@@ -161,6 +163,9 @@ typedef struct _INDIMOTOR
 	ILightVectorProperty word1LP;
 	ILight word1L[16];
 
+	ISwitchVectorProperty iowordSP;
+	ISwitch iowordS[13];//GPIO, fault state and enable line
+
 	ITextVectorProperty nameTP;
 	IText nameT[1];
 	char nameString[30];
@@ -168,12 +173,16 @@ typedef struct _INDIMOTOR
 	ISwitchVectorProperty engSwitchesSP;
 	ISwitch engSwithcesS[1];
 
+	int motor_num; //can address
+
 
 } INDIMOTOR;
 
 INDIMOTOR indi_motors[7];
 
-
+static IText rawCmdT[] = {{"RAWCMD", "Raw Command", "Response Here", 0, 0, 0}};
+static ITextVectorProperty rawCmdTP = {mydev, "RAWCMD", "Raw Command", ENG_GROUP, IP_RW, 0, IPS_IDLE, rawCmdT, NARRAY(rawCmdT) };
+char rawCmdString[50];
 
  /* Note that we must define ISNewBLOB and ISSnoopDevice even if we don't use them, otherwise, the driver will NOT compile */
  void ISNewBLOB (const char *dev, const char *name, int sizes[], int blobsizes[], char *blobs[], char *formats[], char *names[], int n) {}
@@ -200,6 +209,9 @@ INDIMOTOR indi_motors[7];
         IDDefSwitch (&engSwitchSP, NULL);
 		IDDefText(&ttyPortTP, NULL);
 		ttyPortTP.tp[0].text = gttyPORT;
+
+		IDDefText(&rawCmdTP, NULL);
+		rawCmdT[0].text = rawCmdString;
 
 		fillMotors();
 
@@ -265,6 +277,7 @@ INDIMOTOR indi_motors[7];
  {
 	IDMessage(mydev, "ISNewText called [%s], %li", texts[0], sizeof(texts[0]));
 	char septext[30];
+	char respbuff[100];
 	if( !strcmp(name, "COM") )
 	{
 		
@@ -281,6 +294,21 @@ INDIMOTOR indi_motors[7];
 		tp->text = gttyPORT;
 
 		IDSetText(&ttyPortTP, "Changing port to [%s]", ttyPortT[0].text);
+	}
+	if( !strcmp(name, "RAWCMD") )
+	{
+		IDMessage(mydev, "SENDING COMMAND %s", texts[0]);
+		if(connectSP.s == IPS_OK)
+		{
+			//TODO: we might want to make this part of the 
+			//gb_commands if we are trying to stay away from
+			//directo moog_* class.
+			moog_write( RS485_FD, texts[0] );
+			moog_read( RS485_FD, respbuff );
+			strcpy(rawCmdT[0].text, respbuff );
+			rawCmdT[0].text[strlen(respbuff)] = '\0';
+			IDSetText(&rawCmdTP, NULL);
+		}
 	}
  	return;
  }
@@ -454,7 +482,7 @@ void ISNewSwitch (const char *dev, const char *name, ISState *states, char *name
 	if (!strcmp(name, connectSP.name))
 	{
 		sp = IUFindSwitch (&connectSP, names[0]);
-
+		IDMessage(mydev, "CONNECT HAS BEEN CALLED");
 		if (! strcmp(sp->name, connectS[0].name))
 		{
 			if(states[0] == ISS_ON)
@@ -551,8 +579,16 @@ void ISNewSwitch (const char *dev, const char *name, ISState *states, char *name
 	 
 		} /* end for */
 	}
-	else if(!strcmp(name, engSwitchSP.name))
+	else
 	{
+		for ( INDIMOTOR *imotor=indi_motors; imotor!=indi_motors+7; imotor++ )
+		{
+			if( !strcmp(name, imotor->engSwitchesSP.name) )
+			{
+				moog_callsub(RS485_FD, 110, imotor->motor_num);
+				IDMessage(mydev, "We should get %s out of limit", imotor->nameT[0].text  );
+			}
+		}
 
 	}
 
@@ -683,7 +719,10 @@ static INumberVectorProperty *motor2nvp(MSTATUS *motor)
 #  Date: 11/20/12
 #  Args:  N/A
 #  Description: Retrieves all of the basic telemetry from the TCS and stores
-#               it locally for display and later use
+#               it locally for display and later use. The meat of this is done
+#				by populating the allmotors array with the doTelemetry call 
+#				and putting that information in the indi_motors array. 
+#				The indi_motors array much of the motor specific indi properties. 
 #
 #############################################################################*/
 static int guiderTelem(int init_struct)
@@ -699,66 +738,77 @@ static int guiderTelem(int init_struct)
 	INumberVectorProperty *pNVP;
 	ILight *statusLight;
 	ILightVectorProperty *statusLightVP;
-	
-	if( init_struct )
-		memset(allmotors,0,(sizeof(MSTATUS)*7));
+
+	ISwitch *ioBitSwitch;
+	ISwitchVectorProperty *ioBitSwitchVector;
+
+	char readBuffer[40];
+	moog_write( RS485_FD, "RW(13)" );
+	moog_read(RS485_FD, readBuffer );
 	
 
-	active = doTelemetry(RS485_FD, allmotors, init_struct);
 	if(init_struct)
 	{
-		/*
-		for(int ii=0; ii<7; ii++)
-			if (allmotors[ii].isActive)
-				IDMessage(mydev, "%i %s is active", ii, allmotors[ii].name);
-			else
-				IDMessage(mydev, "%i %s is NOT active", ii, allmotors[ii].name);
-		*/
+		memset(allmotors,0,(sizeof(MSTATUS)*7));
 	}
+
+	//TODO: we need some more error checking on doTelemetry. 
+	//I occasionally get a situation where we are happily conneced but the 
+	//allmotors struct doesn't get initialized properly. 
+	//this is caught later when we do the if pNVP == NULL 
+	//a few lines below
+	active = doTelemetry(RS485_FD, allmotors, init_struct);
+
+	//Iterate through the allmotors array so we can populate 
+	//indi fields.
 	for(MSTATUS *motor=allmotors; motor!=allmotors+7; motor++)
 	{
+		if(init_struct)
+		{
+			//apply names to indi_motors from allmotors array.
+			//Here we associate the indi_motor index with the 
+			//motor->motor_num
+			if (indi_motors[motor->motor_num-1].nameT[0].text !=  NULL)
+				strncpy(indi_motors[motor->motor_num-1].nameT[0].text,  motor->name, 30);
+			indi_motors[motor->motor_num-1].motor_num  = motor->motor_num;
+			IDSetText(&indi_motors[motor->motor_num-1].nameTP, NULL);
+		}
+
+		//motor2nvp uses the motor->name to 
+		//grab the correct number vector property
+		//where we will display the position or 
+		//filternumber of each axis. Populating this 
+		//is 99% of what the user should see and use.
+		//The rest of the stuff is for engineering purposes
+		
 		pNVP = motor2nvp(motor);
 		if(pNVP == NULL)
-		{
+		{//stuct did not init properly.
 			IDMessage(mydev, "Bad motor!");
 			continue;
 		}
 		if ( motor->isActive )
-		{
-			//IDMessage(mydev, "%s homed state is %i", motor->name, motor->isHomed);
+		{/*motor->isActive tells us weather the head node was able to communicate with 
+		 motor over the can bus.*/
+			
 			if(motor->isHomed)
 				pNVP->s = IPS_OK;
 			else
 				pNVP->s = IPS_IDLE;
+			
 			pNVP->np[0].value = motor->pos;
-			IDMessage(mydev, "motor_num is %i", motor->motor_num);
 			statusLight = indi_motors[motor->motor_num-1].word0L;
 			statusLightVP = &indi_motors[motor->motor_num-1].word0LP;
-	/*		switch( motor->motor_num )
-			{
-				case 1:
-					statusLight = indi_motors[0].word0L;
-					statusLightVP = &indi_motors[0].word0LP;
-				break;
-				case 2:
-					statusLight = indi_motors[1].word0L;
-					statusLightVP = &indi_motors[1].word0LP;
-				break;
-				default:
-					statusLight = NULL;
-					statusLightVP = NULL;
-			}
-				*/
+			ioBitSwitch = indi_motors[motor->motor_num-1].iowordS;
+			ioBitSwitchVector = &indi_motors[motor->motor_num-1].iowordSP;
 			if(statusLight != NULL)
 			{
 				for(int sbit=0; sbit<16; sbit++)
 				{	
-		
-
 					//IDMessage(mydev, "MOTOR 2 your up, checking bit %i %i %i",sbit, motor->words[0] & (1<<sbit), motor->words[0] );
 					if(motor->words[0] & (1<<sbit))
 					{
-						IDMessage(mydev, "%i %i %i", sbit, motor->words[0], motor->words[0] & (1<<sbit));
+						//IDMessage(mydev, "%s %s %i bit is %s", statusLightVP->name, motor->name, motor->words[0], statusLight[sbit].name);
 						statusLight[sbit].s = IPS_ALERT;
 					}
 					else
@@ -766,6 +816,16 @@ static int guiderTelem(int init_struct)
 						statusLight[sbit].s = IPS_IDLE;
 					}
 					IDSetLight(statusLightVP, NULL);
+
+					if(motor->iobits & (1<<sbit))
+					{
+						ioBitSwitch[sbit].s = ISS_ON;
+					}
+					else
+					{
+						ioBitSwitch[sbit].s = ISS_OFF;
+					}
+					IDSetSwitch(ioBitSwitchVector, NULL );
 
 				}
 			}
@@ -775,113 +835,15 @@ static int guiderTelem(int init_struct)
 		else
 			pNVP->s = IPS_ALERT;
 
-		snprintf(mname, 30, "M%i", motor->motor_num);
-		strcpy(gstatusString[motor->motor_num-1], "");
-		buildMStatusString(motor, gstatusString[motor->motor_num-1]);
-		
-		motorStatusT[motor->motor_num-1].text = gstatusString[motor->motor_num-1] ;
+		//snprintf(mname, 30, "M%i", motor->motor_num);
 
 		
 		IDSetNumber(pNVP, NULL);
 	}
 
-	//IDSetText(&motorStatusTP, NULL);
-	//IDSetText(&motor1TP, NULL);
-	//IDSetText(&motor2TP, NULL);
-	/*IDDefNumber  (&ufwNPR, NULL);
-	IDDefNumber  (&lfwNPR, NULL);
-	IDDefNumber  (&offxNPR, NULL);
-	IDDefNumber  (&offyNPR, NULL);
-	IDDefNumber  (&offFocNPR, NULL);
-	IDDefNumber  (&offMirrNPR, NULL);
-	IDDefNumber  (&ofwNPR, NULL);*/
-
-	
-	lfwNR[0].value = (double) allmotors[5].fnum;
-	ufwNR[0].value = (double) allmotors[6].fnum;
-	ofwNR[0].value = (double) allmotors[4].fnum;
-
-
-	offFocNR[0].value = (double) allmotors[2].pos;
-	offxNR[0].value = (double) allmotors[0].pos;
-	offyNR[0].value = (double) allmotors[1].pos;
-	offMirrNR[0].value = (double) allmotors[3].pos;
-	IDSetNumber(&offxNPR, NULL);
-	IDSetNumber(&offyNPR, NULL);
-	IDSetNumber(&offMirrNPR, NULL);
-	IDSetNumber(&offFocNPR, NULL);
-	IDSetNumber(&ofwNPR, NULL);
-	IDSetNumber(&lfwNPR, NULL);
-	IDSetNumber(&ufwNPR, NULL);
 
 	fprintf(stderr, "in guiderTelem %s\n", allmotors[5].name );
-	//indinum=NULL;
-	/*
-	for (ix=0;ix<7;ix++)
-		{
-		//mstat=&allmotors[ix];
-		
-		if(!strcmp(ufwNR[0].name, allmotors[ix].name))
-			{
-			isFilter=1;
-			ufwNR[0].value = allmotors[ix].fnum;
-			//break;
-			}
-		else if(!strcmp(lfwNR[0].name, allmotors[ix].name))
-			{
-			isFilter=1;
-			//lfwNR[0].value = allmotors[ix].fnum;
-			//break;
-			}
-		else if(!strcmp(offxNR[0].name, allmotors[ix].name))
-			{
-			indinum=&offxNR[0];
-			//break;
-			}
-		else if(!strcmp(offyNR[0].name, allmotors[ix].name))
-			{
-			indinum=&offyNR[0];
-			//break;
-			}
-		else if(!strcmp(offFocNR[0].name, allmotors[ix].name))
-			{
-			indinum=&offFocNR[0];
-			//break;
-			}
-		else if(!strcmp(offMirrNR[0].name, allmotors[ix].name))
-			{
-			indinum=&offMirrNR[0];
-			//break;
-			}
-		else if(!strcmp(ofwNR[0].name, allmotors[ix].name))
-			{
-			isFilter=1;
-			indinum=&ofwNR[0];
-			//break;
-			}
-		else
-			{
-			fprintf(stderr, "no match\n");
-			indinum=NULL;
-			mstat=NULL;
-			}
-		fprintf(stderr, "ix=%i indiname=%s motorsname=%s\n", ix, indinum->name, allmotors[ix].name );
-		fprintf(stderr, "ix=%i indival=%f motorval=%i\n", ix, indinum->value, allmotors[ix].pos );
-		indinum->value = (double)allmotors[ix].pos;
-		if (isFilter)
-			indinum[0].value = (double)allmotors[ix].fnum;
-		
-		}
-		
-		IDSetNumber(&offxNPR, NULL);
-            	IDSetNumber(&offyNPR, NULL);
-            	IDSetNumber(&offMirrNPR, NULL);
-            	IDSetNumber(&offFocNPR, NULL);
-            	IDSetNumber(&ofwNPR, NULL);
-            	IDSetNumber(&lfwNPR, NULL);
-            	IDSetNumber(&ufwNPR, NULL);
-				*/
- 		return 1;
+ 	return 1;
         
 
  }
@@ -949,7 +911,17 @@ void guiderProc (void *p)
 
 
 
- 
+/***********************************************************
+ *Name: buildMStatusString
+ *args: motor -> MSTATUS struct from allmotors array
+ *		mstring -> string to populate with motor status infor
+ *Description:
+ * 				Build a string of usefull status info.
+ * 				We no longer use this function to populate
+ * 				a string. We decided a set of various widgets
+ * 				would be more apt to display status. 
+ *		-Scott Swindell 9/2019
+ * **********************************************************/
 static void buildMStatusString(MSTATUS *motor, char mstring[])
 {
 	char dummy[100];
@@ -981,10 +953,12 @@ static void fillMotors()
 	char name[20];
 	char label[20];
 	char group[20];
-	char code[23];
+	char code[300];
 	int motor_num = 1;
 	fprintf(stderr, "FILLING THE MOTORS\n");
-	const char * STATUS_CODES[16] = {
+	int lenlimit = 30;
+	const char * STATUS_CODES[2][16] = {
+		{
 			"Drive Ready",
 			"Bo: Motor is off (indicator)",
 			"Bt: Trajectory in progress (indicator)",
@@ -1001,9 +975,7 @@ static void fillMotors()
 			"Historical Left Limit (- or Negative)",
 			"Right ( + or Positive) Limit Asserted",
 			"Left Limit ( - or Negative) Asserted",
-		};
-
-	const char * STATUS_CODES_W1[16] =
+		},
 		{
 			"Rise Capture Encoder(0) Armed",
 			"Fall Capture Encoder(0) Armed",
@@ -1021,45 +993,82 @@ static void fillMotors()
 			"Historical negative software over travel limit",
 			"Real time positive soft limit (indicator)",
 			"Real time negative soft limit (indicator)",
-		};
+		}
+	};
 	
 	for(INDIMOTOR *imotor=indi_motors; imotor!=indi_motors+7; imotor++)
 	{
-		snprintf(group, 20, "Motor %i Eng", motor_num );
 
-		snprintf(label, 20, "Motor %i Word 0", motor_num );
-		snprintf(name, 20, "M%iW0", motor_num);
+		
+		snprintf( group, 20, "Motor %i Eng", motor_num );
+		
+		snprintf( name, 20, "M%iIO", motor_num );
+		IUFillSwitchVector( &imotor->iowordSP, imotor->iowordS, NARRAY(imotor->iowordS), mydev, name, "IO", group, IP_RO, ISR_NOFMANY, 0, IPS_IDLE);
+
+		snprintf( name, 20, "M%iLIM", motor_num );
+		IUFillSwitchVector(&imotor->engSwitchesSP, imotor->engSwithcesS, NARRAY(imotor->engSwithcesS), mydev, name, "Special", group, IP_RW, ISR_NOFMANY, 0, IPS_IDLE);
+		IUFillSwitch(imotor->engSwithcesS, name, "Get Out of Limit", IPS_IDLE);
+		IDDefSwitch(&imotor->engSwitchesSP, NULL);
+
+		//Name of the motor
+		snprintf( name, 20, "M%iName", motor_num );
+		IUFillTextVector(&imotor->nameTP, imotor->nameT, NARRAY(imotor->nameT), mydev, name, "Motor Name", group, IP_RO, 0, IPS_IDLE);
+
+		IUFillText(imotor->nameT, "MNAME", "Motor Name", "NULL");
+
+		imotor->nameT[0].text = imotor->nameString;
+		IDDefText(&imotor->nameTP, NULL);
+
+		//Motor status words
+		snprintf( label, 20, "Motor %i Word 0", motor_num );
+		snprintf( name, 20, "M%iW0", motor_num );
 		IUFillLightVector(&imotor->word0LP, imotor->word0L, NARRAY(imotor->word0L), mydev, (const char *) name, (const char *) label, group, IPS_IDLE );
 		
-
+		
 
 		for(int code_num=0; code_num<16; code_num++)
 		{
 			snprintf(name, 20, "BIT%i", code_num);
-			strncpy(code, STATUS_CODES[code_num], 20);
-			if( sizeof(STATUS_CODES[code_num]) > 20 )
-				strcat(code, "...");
-			IUFillLight(imotor->word0L+code_num, name, STATUS_CODES[code_num], IPS_IDLE);
-		}
+			strncpy(code, STATUS_CODES[0][code_num], lenlimit);
+			if( strlen(STATUS_CODES[0][code_num]) > lenlimit )
+				strcpy(code+lenlimit, "...");
+			code[strlen(code)] = '\0';
 
+			IUFillLight(imotor->word0L+code_num, name, (const char *) code, IPS_IDLE);
+
+			if ( code_num < 11)
+			{//only 10 lines of gpio...
+				snprintf(name, 20, "IO_%02i", code_num);
+				IUFillSwitch(imotor->iowordS+code_num, name, name, ISS_OFF);
+			}
+			else if(code_num == 11)
+			{//... and a line for Not Faulted...
+				IUFillSwitch(imotor->iowordS+code_num, "NOFAULT", "Not Fauted", ISS_OFF);
+			}
+			else if(code_num == 12)
+			{//... and a line for Drive enable output which should always be high.
+				IUFillSwitch(imotor->iowordS+code_num, "ENBL", "Enabled", ISS_OFF);
+				IDMessage(mydev, "WE MADE IT TO ENABLE");
+			}
+		}
 		IDDefLight(&imotor->word0LP, NULL);
+		IDDefSwitch(&imotor->iowordSP, NULL);
+
 		snprintf(label, 20, "Motor %i Word 1", motor_num );
 		snprintf(name, 20, "M%iW1", motor_num);
 		IUFillLightVector(&imotor->word1LP, imotor->word1L, NARRAY(imotor->word1L), mydev, (const char *) name, (const char *) label, group, IPS_IDLE );
 
 		for(int code_num=0; code_num<16; code_num++)
-		{
-			snprintf(name, 20, "BIT%i", code_num);
-			strncpy(code, STATUS_CODES[code_num], 20);
+		{//TODO this could be done in the above for loop.
+			snprintf(name, 20, "BIT_02%i", code_num);
+			strncpy(code, STATUS_CODES[1][code_num], lenlimit);
 
-			if(sizeof(STATUS_CODES[code_num]) > 20)
-				strcat(code, "...");
-			IUFillLight(imotor->word1L+code_num, name, STATUS_CODES[code_num], IPS_IDLE);
+			if(sizeof(STATUS_CODES[1][code_num]) > lenlimit)
+				strcpy(code+lenlimit, "...");
+			IUFillLight(imotor->word1L+code_num, name, code, IPS_IDLE);
 		}
 		IDDefLight(&imotor->word1LP, NULL);
 
 		motor_num++;
-
 	}
 }
-
