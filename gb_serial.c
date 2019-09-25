@@ -182,31 +182,19 @@ int open_port( char usbport[] )
 
 	char serialfix = 128;
 
-	/*fd = open(usbport, O_RDWR | O_NOCTTY | O_NDELAY);
-	fcntl(fd, F_SETFL, FNDELAY);
-	if (fd == -1)
-	{
-		//Could not open the port.
-		perror("open_port: Unable to open port");
-	}
-
-
-	else
-		fcntl(fd, F_SETFL, 0);*/
-
-
+	
 	fd = open (usbport, O_RDWR | O_NOCTTY | O_SYNC);
 	if (fd < 0)
 		{
-        	error_message ("error %d opening %s: %s", errno, usbport, strerror (errno));
-        	return (fd);
+   		error_message ("error %d opening %s: %s", errno, usbport, strerror (errno));
+      	return (fd);
 		}	
 
 	set_interface_attribs (fd, B9600, 0);  // set speed to 9600 bps, 8n1 (no parity)
 	set_blocking (fd, 0);                // set no blocking
 	
-  // this is necessary, not sure why.
-
+	// this is necessary, not sure why.
+	moog_write(fd, &serialfix);
 	
 	
 	return (fd);

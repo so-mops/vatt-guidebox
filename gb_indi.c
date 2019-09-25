@@ -46,8 +46,8 @@
 #define MOT5_GROUP "MOTOR 5 Eng"
 #define MOT6_GROUP "MOTOR 6 Eng"
 #define MOT7_GROUP "MOTOR 7 Eng"
-#
-  #define POLLMS          1000                             /* poll period, ms */
+
+#define POLLMS          1000                             /* poll period, ms */
 
 
 
@@ -473,6 +473,7 @@ void ISNewSwitch (const char *dev, const char *name, ISState *states, char *name
 	char ret[20]; 
 	ISState state;	
 	int isDifferent;
+	char respbuffer[50];
 
 	/* ignore if not ours */
 	if (strcmp (dev, mydev))
@@ -512,6 +513,7 @@ void ISNewSwitch (const char *dev, const char *name, ISState *states, char *name
 					//connectS[1].s = ISS_ON;
 					connectSP.s = IPS_ALERT;
 					IDSetSwitch (&connectSP, "Could Not connect to guider on port %s", ttyPortT[0].text);
+					inited=0;
 				}
 			}
 			else
@@ -519,7 +521,7 @@ void ISNewSwitch (const char *dev, const char *name, ISState *states, char *name
 				ttyClose(RS485_FD);
 				connectS[0].s = ISS_OFF;
 				connectSP.s = IPS_IDLE;
-				IDSetSwitch(&connectSP, NULL);
+				IDSetSwitch(&connectSP, "Disconnecting Guider");
 			}		
 
 
@@ -586,7 +588,8 @@ void ISNewSwitch (const char *dev, const char *name, ISState *states, char *name
 			if( !strcmp(name, imotor->engSwitchesSP.name) )
 			{
 				moog_callsub(RS485_FD, 110, imotor->motor_num);
-				IDMessage(mydev, "We should get %s out of limit", imotor->nameT[0].text  );
+				moog_read(RS485_FD, respbuffer);
+				IDMessage(mydev, "Moving %s out of limit resp is %s.", imotor->nameT[0].text, respbuffer  );
 			}
 		}
 
@@ -847,6 +850,8 @@ static int guiderTelem(int init_struct)
         
 
  }
+
+
 
 /*############################################################################
 #  Title: guiderProc
