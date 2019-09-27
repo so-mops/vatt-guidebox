@@ -16,12 +16,14 @@
 #define QFWHEEL_UPPER "7"
 
 
+
 #define OFFSET_X_OK B(12, OFFSET_X)
 #define OFFSET_Y_OK B(12, OFFSET_Y)
 #define OFFSET_FOCUS_OK B(12, OFFSET_FOCUS)
 #define OFFSET_MIRRORS_OK B(12, OFFSET_MIRRORS)
 #define OFFSET_FWHEEL_OK B(12, OFFSET_FWHEEL)
 #define FWHEEL_LOWER_OK B(12, FWHEEL_LOWER)
+
 #define FWHEEL_UPPER_OK B(12, FWHEEL_UPPER)
 
 
@@ -38,6 +40,7 @@
 #define NEG_LIMIT_RT Bm ' Real time negative limit
 #define POS_LIMIT_RT Bp ' Real time positive limit
 #define NEG_LIMIT_HIST Bl ' Historical negative limit
+
 #define POS_LIMIT_HIST Br ' Historical positive limit
 
 #define NEG_MSWITCH_POS nnn 'Position of negative mechanical limit switch
@@ -64,7 +67,7 @@
 #define GET_NODE_READY B(12, 14)
 
 
-OCHN(RS4,0,N,115200,1,8,C)
+
 #define HEAD_NODE_SETUP_DONE gg
 
 #define FILTER_DIST hh ' Number of counts between filters 
@@ -72,6 +75,7 @@ OCHN(RS4,0,N,115200,1,8,C)
 #define CENTER_POS jj ' Postion of the center field mirror
 
 #define FILTER_NUMBER f
+
 
 
 DEBUG = 1
@@ -96,14 +100,41 @@ CASE FWHEEL_LOWER
 	EIGN(3)
 	SLD
 	ZS
+	KP=8000
+	KI=10
+	KD=9000
+	KL=40
+	WAIT=500
+	F
 	
+BREAK
+CASE FWHEEL_UPPER
+	IF DEBUG == 1 PRINT("SETTING UP FWHEEL_LOWER", #13) ENDIF
+	EIGN(2)
+	EIGN(3)
+	SLD
+	ZS
+	KP=8000
+	KI=10
+	KD=9000
+	KL=40
+	WAIT=500
+	F
+
 BREAK
 CASE OFFSET_FWHEEL
 	IF DEBUG == 1 PRINT("SETTING UP OFFSET_FWHEEL", #13) ENDIF
 	EIGN(2)
 	EIGN(3)
 	SLD
-	ZS	
+	ZS
+	KP=8000'Set the proportional gain
+	KI=10 ' Set the Integrator gain
+	KD=9000 ' Set the differential gain
+	KL=40 ' Set the integrator clip
+	WAIT=500 ' We must wait half a second or F won't work 
+	F 'Apply servo values.
+
 BREAK
 
 ENDS
@@ -267,6 +298,7 @@ C102 ' Home assuming the home sensor is only active at the index (edge detection
 
 RETURN
 
+
 C101 'HOME at the limits'
 	SLD
 	MV
@@ -335,6 +367,7 @@ C100 ' Home all the motors in series
 	ENDIF
 
 RETURN
+
 
 C110 'Get out of limit
 	'Algorithm:
@@ -515,10 +548,10 @@ C0  ' Startup stuff the head node motor
 	ENDIF
 
 	Zs
-	MAXV:OFFSET_FWHEEL = 300000
-	ACCEL:OFFSET_FWHEEL = 500
-	DECEL:OFFSET_FWHEEL = 500
-	FILTER_DIST:OFFSET_FWHEEL = 20000
+	MAXV:OFFSET_FWHEEL = 20000
+	ACCEL:OFFSET_FWHEEL = 2
+	DECEL:OFFSET_FWHEEL = 2
+	FILTER_DIST:OFFSET_FWHEEL = 1630
 	WAIT=100
 	IF Bs == 1
 		IF DEBUG == 1 PRINT("OFFSET Filter Wheel not accessible on CAN", #13 ) ENDIF
@@ -528,10 +561,10 @@ C0  ' Startup stuff the head node motor
 	ENDIF
 
 	Zs
-	MAXV:FWHEEL_UPPER = 300000
-	ACCEL:FWHEEL_UPPER = 500
-	DECEL:FWHEEL_UPPER = 500
-	FILTER_DIST:FWHEEL_UPPER =20000
+	MAXV:FWHEEL_UPPER = 20000
+	ACCEL:FWHEEL_UPPER = 2
+	DECEL:FWHEEL_UPPER = 2
+	FILTER_DIST:FWHEEL_UPPER =1630
 	WAIT=100
 	IF Bs == 1
 		IF DEBUG == 1 PRINT("Upper Filter Wheel not accessible on CAN", #13 ) ENDIF
@@ -545,10 +578,10 @@ C0  ' Startup stuff the head node motor
 		PRINT("COMMAD ERROR", #13)
 		WAIT=3000
 	LOOP
-	MAXV:FWHEEL_LOWER = 300000
-	ACCEL:FWHEEL_LOWER = 500
-	DECEL:FWHEEL_LOWER = 500
-	FILTER_DIST:FWHEEL_LOWER = 20000
+	MAXV:FWHEEL_LOWER = 20000
+	ACCEL:FWHEEL_LOWER = 2
+	DECEL:FWHEEL_LOWER = 2
+	FILTER_DIST:FWHEEL_LOWER = 1630
 	WAIT=100
 	IF Bs == 1
 		IF DEBUG == 1 PRINT("Lower Filter wheel not accessible on CAN", #13 ) ENDIF
@@ -563,73 +596,15 @@ RETURN
 C400 ' go to filter
 	
 	MP
-	IF f > 0
+	IF f >= 0
+
 		IF f < 7
 			PT = f * FILTER_DIST
 			RELEASE_SOLENOID
 			G TWAIT
 			ENGAGE_SOLENOID
 		ENDIF
-	ENDIF
-RETURN
 
-C1 ' All nodes startup
-	' This subroutine is meant to be run by all nodes
-
-	xxx = 1
-
-	WHILE  GET_NODE_READY == 0
-		WAIT=500 ' Dont flood the can bus
-	LOOP
-	xxx = 2
-	IF CADDR == HEAD_NODE
-		PRINT( "Starting setup for all motors", #13 )
-	ENDIF
-	xxx = 3
-	VT=MAXV
-	AT=ACCEL
-	DT=DECEL
-
-	xxx = 4
-	
-	EPTR=EEP_SOFTWARE_LIMIT	
-	VLD(NEG_SLIMIT, 1)
-	xxx = 5
-	EPTR=EEP_SOFTWARE_LIMIT+4
-	VLD(POS_SLIMIT, 1)
-
-	xxx=6
-	IF NEG_SLIMIT == 0
-		SLD
-		IF DEBUG == 1 PRINT("SLIMIT not in EEPROM, Disabling 1", #13 ) ENDIF
-	ELSEIF POS_SLIMIT ==  0
-		SLD
-		IF DEBUG == 1 PRINT("SLIMIT not in EEPROM, Disabling 2", #13 ) ENDIF
-	ELSEIF POS_SLIMIT == NEG_SLIMIT
-		SLD
-		IF DEBUG == 1 PRINT("SLIMIT not in EEPROM, Disabling 2", #13 ) ENDIF
-	
-	ELSE
-		SLN=NEG_SLIMIT
-		SLP=POS_SLIMIT
-		SLE
-	ENDIF
-	xxx=7
-RETURN
-
-C55 ' Clear the command error
-	Zs
-	WHILE Bs == 1 
-		IF DEBUG == 1 PRINT("Clearing command error.", #13) ENDIF
-		WAIT=1000
-	LOOP
-RETURN	
-
-
-
-
-C50 ' Attempt to find spare
-RETURN
 C998 'Send square wave to LED on optical switch'
 	WHILE 1
 		OR(4)
@@ -638,6 +613,7 @@ C998 'Send square wave to LED on optical switch'
 		WAIT=1000
 	LOOP
 RETURN
+
 
 
 C999 ' print map of motor number to name
@@ -651,4 +627,4 @@ C999 ' print map of motor number to name
 	PRINT("MOTOR #", QFWHEEL_UPPER, " FWHEEL_UPPER", #13)
 	
 RETURN
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
+
