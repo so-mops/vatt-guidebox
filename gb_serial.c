@@ -588,7 +588,9 @@ void print_status(MSTATUS stat)
  * 		to get a list of all the motor names 
  * 		and their numbers from from the serial 
  * 		line. This information is then stored 
- * 		in the array of status structs. 
+ * 		in the array of status structs. This
+ * 		is how the GUI maps the can address 
+ *		(motor_num) to the name of the motor.
  *
  *
  *
@@ -598,28 +600,29 @@ int build_stat_structs( int rs485_fd, MSTATUS motors[] )
 	char resp[READSIZE];
 	moog_read(rs485_fd, resp); //flush line
 	int wc;
-	moog_callsub(rs485_fd, 999, -1);
+	moog_callsub(rs485_fd, 999, -1 );
 	
-	moog_read( rs485_fd, resp);
+	moog_read( rs485_fd, resp );
 	wc = sscanf(resp, "MOTOR #%i %s", &motors[0].motor_num, motors[0].name );
 
-	moog_read( rs485_fd, resp);
+	moog_read( rs485_fd, resp );
 	wc = sscanf(resp, "MOTOR #%i %s", &motors[1].motor_num, motors[1].name );
 
 	moog_read( rs485_fd, resp);
 	wc = sscanf(resp, "MOTOR #%i %s", &motors[2].motor_num, motors[2].name );
 
-	moog_read( rs485_fd, resp);
+	moog_read( rs485_fd, resp );
 	wc = sscanf(resp, "MOTOR #%i %s", &motors[3].motor_num, motors[3].name );
 	
-	moog_read( rs485_fd, resp);
+	moog_read( rs485_fd, resp );
 	wc = sscanf(resp, "MOTOR #%i %s", &motors[4].motor_num, motors[4].name );
 
-	moog_read( rs485_fd, resp);
+	moog_read( rs485_fd, resp );
 	wc = sscanf(resp, "MOTOR #%i %s", &motors[5].motor_num, motors[5].name );
 
-	moog_read( rs485_fd, resp);
+	moog_read( rs485_fd, resp );
 	wc = sscanf(resp, "MOTOR #%i %s", &motors[6].motor_num, motors[6].name );
+
 }
 
 

@@ -304,6 +304,7 @@ char rawCmdString[50];
 			//gb_commands if we are trying to stay away from
 			//directo moog_* class.
 			moog_write( RS485_FD, texts[0] );
+			usleep(2000);
 			moog_read( RS485_FD, respbuff );
 			strcpy(rawCmdT[0].text, respbuff );
 			rawCmdT[0].text[strlen(respbuff)] = '\0';
@@ -760,6 +761,8 @@ static int guiderTelem(int init_struct)
 	//allmotors struct doesn't get initialized properly. 
 	//this is caught later when we do the if pNVP == NULL 
 	//a few lines below
+	
+	fprintf(stderr, "init_struct is %i\n", init_struct);
 	active = doTelemetry(RS485_FD, allmotors, init_struct);
 
 	//Iterate through the allmotors array so we can populate 
