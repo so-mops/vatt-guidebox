@@ -2,8 +2,8 @@
 #  Title: gb_commands.c
 #  Author: Chris Johnson
 #  Date: 9/4/19
-#  Description: commands for guide box
-#
+#  Description: commands for guide box..  abstracted from serial commands
+#	for easy use by command line, indi driver, and ng protocol
 #
 #############################################################################*/ 
 
@@ -18,23 +18,26 @@
  #include <sys/time.h>
  #include <time.h>
 
- #include "gb_serial.h"
  #include "gb_commands.h"
 
-MSTATUS allmotors[7];
-
-
+//MSTATUS allmotors[7];
 
 /*############################################################################
 #  Title: stageHome
 #  Author: C.Johnson
 #  Date: 9/9/19
-#  Args:  N/A
-#  Description: 
+#  Args:  int ttyfd -> tty port file descriptor
+#	  char *stage -> string containing name of stage
+#  Returns: ???
+#  Description: send stage to home position...  not yet fully implemented
 #
 #############################################################################*/
  int stageHome (int ttyfd, char *stage)
- { 
+ {
+ if (stage == NULL)
+ {
+	 moog_home(ttyfd, -1);
+ } 
  return 1;
       
  }
@@ -43,8 +46,10 @@ MSTATUS allmotors[7];
 #  Title: ttyOpen
 #  Author: C.Johnson
 #  Date: 9/9/19
-#  Args:  N/A
-#  Description: 
+#  Args:  char *ttyport -> string containing name of port to use(/dev/ttyUSB0)
+#  Returns: file descriptor of open tty port
+#  Description: opens the tty port referred to by ttyPort and returns a file
+#	descriptor
 #
 #############################################################################*/
  int ttyOpen (char *ttyPort)
@@ -60,8 +65,9 @@ MSTATUS allmotors[7];
 #  Title: ttyClose
 #  Author: C.Johnson
 #  Date: 9/9/19
-#  Args:  N/A
-#  Description: 
+#  Returns: N/A
+#  Args:  int ttyfd -> tty port file descriptor
+#  Description: closes the ttyport referred to by the file descriptor ttyfd
 #
 #############################################################################*/
  void ttyClose (int ttyfd)
@@ -71,17 +77,35 @@ MSTATUS allmotors[7];
         	
  }
 
+/*############################################################################
+#  Title: guiderRead
+#  Author: Scott Swindell
+#  Date: 9/20/19
+#  Returns: 0 on success -1 if there is nothing to read.
+#  Args:  int ttyfd -> tty port file descriptor
+#		resp -> response to be filled on read
+#  Description: closes the ttyport referred to by the file descriptor ttyfd
+#
+#############################################################################*/
+
+ int guiderRead(int ttyfd, char * resp)
+ {
+ 	return moog_read(ttyfd, resp);
+ }
 
 
 /*############################################################################
 #  Title: stageGoTo
 #  Author: C.Johnson
 #  Date: 9/9/19
-#  Args:  N/A
-#  Description: 
+#  Args:  int ttyfd -> tty port file descriptor
+#	  char *strAxis -> string containing name of stage
+#	  int position -> new position
+#  Returns: on success, integer value of axis(non-zero).  0 on failure
+#  Description: sents the stage named strAxis to new position "position"
 #
 #############################################################################*/
- int stageGoTo (int port_fd, char *strAxis, int POSITION)
+ int stageGoTo (int ttyfd, char *strAxis, int POSITION)
  { 
   int isFilter=0, iAxis;
 	iAxis = validateAxis(strAxis, &isFilter);
@@ -91,12 +115,14 @@ MSTATUS allmotors[7];
 		}
 	if (isFilter)
 		{
-		moog_fgoto(port_fd, iAxis, POSITION);
+		moog_fgoto(ttyfd, iAxis, POSITION);
 		}
        else
 		{
-		moog_lgoto(port_fd, iAxis, POSITION);
+		moog_lgoto(ttyfd, iAxis, POSITION);
 		}
+
+	printf("got axis %i:%s isfilter=%i\n", iAxis, strAxis, isFilter);
        return iAxis;
 
         	
@@ -107,45 +133,23 @@ MSTATUS allmotors[7];
 #  Title: guider_init( char usbport[] )
 #  Author: C.Johnson
 #  Date: 9/3/19
-#  Args:  N/A
-#  Description: 
+#  Args:  int ttyfd -> tty port file descriptor
+#  Returns: ???
+#  Description: sends the init string to the head node.  this inits all
+#	motors on the bus.
 #
 #############################################################################*/
-int guider_init( int port_fd )
+int guider_init( int ttyfd )
 {
 char resp[READSIZE];
 
 
-	moog_read(port_fd, resp);
+	moog_read(ttyfd, resp);
 	printf("moog_resp=%s\n", resp);
-	moog_init( port_fd );
-	//build_stat_structs(port_fd, allmotors); //Map names to numbers
+	moog_init( ttyfd );
 	
 	
 }
-
-/*############################################################################
-#  Title: port_init( int open, char usbport[], int port_fd )
-#  Author: C.Johnson
-#  Date: 9/6/19
-#  Args:  N/A
-#  Description: 
-#
-#############################################################################*/
-int port_init( int open, char usbport[], int port_fd )
-{
-
-
-	if (open)
-		port_fd = open_port( usbport );	
-	else
-		close_port(port_fd);
-
-
-	return port_fd;
-	
-}
-
 
 
 /*############################################################################
@@ -154,6 +158,7 @@ int port_init( int open, char usbport[], int port_fd )
 #  Date: 9/3/19
 #  Args:  char *axis -> string of axis name
 #	int *isFilter -> pointer to integer flag to say whether this is a filter.
+#  Returns: on success, integer value of axis(non-zero).  0 on failure
 #  Description: validates the axis string and returns an appropriate port int
 #    otherwise returns 0
 #
@@ -192,32 +197,27 @@ return iaxis;
 #  Title: doTelemetry
 #  Author: C.Johnson
 #  Date: 9/4/19
-#  Args:  
-#  Description: grabs telemetry from guider
+#  Args:  int ttyfd -> tty port file descriptor
+#  Returns: ???
+#  Description: grabs telemetry from guider..  hack from S.Swindells original
+#	example routine.
 #
 #############################################################################*/
-int doTelemetry(int port_fd)
+int doTelemetry(int ttyfd, MSTATUS *allmotors, int init_struct)
 {
 char resp[200];
 int active, x;
 
-printf("pretending to do telemetry\n");
-	moog_write( port_fd, "RW(12)"  ); //user bits that show which motors are active
-	x=moog_read( port_fd, resp );
-	if(x>0)
-		printf("moog_response = %s\n", resp);
-	else
-		printf("no_response\n");
-	
-	active = atoi(resp);
 
-	for(int num=1; num<9; num++)
+	//It should be called once at the beginning of the program.
+	if(init_struct)
 	{
-		if(active & (1<<num))
-		{
-			moog_getstatus(port_fd, &allmotors[num-1]);
-			print_status( allmotors[ num-1 ] );
-		}
+		fprintf(stderr, "starting build_stat_structs");
+		build_stat_structs( ttyfd, allmotors );
 	}
 
+	
+	return moog_getallstatus(ttyfd, allmotors);
+	
+	
 }

@@ -16,12 +16,14 @@
 #define QFWHEEL_UPPER "7"
 
 
+
 #define OFFSET_X_OK B(12, OFFSET_X)
 #define OFFSET_Y_OK B(12, OFFSET_Y)
 #define OFFSET_FOCUS_OK B(12, OFFSET_FOCUS)
 #define OFFSET_MIRRORS_OK B(12, OFFSET_MIRRORS)
 #define OFFSET_FWHEEL_OK B(12, OFFSET_FWHEEL)
 #define FWHEEL_LOWER_OK B(12, FWHEEL_LOWER)
+
 #define FWHEEL_UPPER_OK B(12, FWHEEL_UPPER)
 
 
@@ -38,6 +40,7 @@
 #define NEG_LIMIT_RT Bm ' Real time negative limit
 #define POS_LIMIT_RT Bp ' Real time positive limit
 #define NEG_LIMIT_HIST Bl ' Historical negative limit
+
 #define POS_LIMIT_HIST Br ' Historical positive limit
 
 #define NEG_MSWITCH_POS nnn 'Position of negative mechanical limit switch
@@ -295,6 +298,7 @@ C102 ' Home assuming the home sensor is only active at the index (edge detection
 
 RETURN
 
+
 C101 'HOME at the limits'
 	SLD
 	MV
@@ -363,6 +367,7 @@ C100 ' Home all the motors in series
 	ENDIF
 
 RETURN
+
 
 C110 'Get out of limit
 	'Algorithm:
@@ -592,72 +597,14 @@ C400 ' go to filter
 	
 	MP
 	IF f >= 0
+
 		IF f < 7
 			PT = f * FILTER_DIST
 			RELEASE_SOLENOID
 			G TWAIT
 			ENGAGE_SOLENOID
 		ENDIF
-	ENDIF
-RETURN
 
-C1 ' All nodes startup
-	' This subroutine is meant to be run by all nodes
-
-	xxx = 1
-
-	WHILE  GET_NODE_READY == 0
-		WAIT=500 ' Dont flood the can bus
-	LOOP
-	xxx = 2
-	IF CADDR == HEAD_NODE
-		PRINT( "Starting setup for all motors", #13 )
-	ENDIF
-	xxx = 3
-	VT=MAXV
-	AT=ACCEL
-	DT=DECEL
-
-	xxx = 4
-	
-	EPTR=EEP_SOFTWARE_LIMIT	
-	VLD(NEG_SLIMIT, 1)
-	xxx = 5
-	EPTR=EEP_SOFTWARE_LIMIT+4
-	VLD(POS_SLIMIT, 1)
-
-	xxx=6
-	IF NEG_SLIMIT == 0
-		SLD
-		IF DEBUG == 1 PRINT("SLIMIT not in EEPROM, Disabling 1", #13 ) ENDIF
-	ELSEIF POS_SLIMIT ==  0
-		SLD
-		IF DEBUG == 1 PRINT("SLIMIT not in EEPROM, Disabling 2", #13 ) ENDIF
-	ELSEIF POS_SLIMIT == NEG_SLIMIT
-		SLD
-		IF DEBUG == 1 PRINT("SLIMIT not in EEPROM, Disabling 2", #13 ) ENDIF
-	
-	ELSE
-		SLN=NEG_SLIMIT
-		SLP=POS_SLIMIT
-		SLE
-	ENDIF
-	xxx=7
-RETURN
-
-C55 ' Clear the command error
-	Zs
-	WHILE Bs == 1 
-		IF DEBUG == 1 PRINT("Clearing command error.", #13) ENDIF
-		WAIT=1000
-	LOOP
-RETURN	
-
-
-
-
-C50 ' Attempt to find spare
-RETURN
 C998 'Send square wave to LED on optical switch'
 	WHILE 1
 		OR(4)
@@ -666,6 +613,7 @@ C998 'Send square wave to LED on optical switch'
 		WAIT=1000
 	LOOP
 RETURN
+
 
 
 C999 ' print map of motor number to name
@@ -679,3 +627,4 @@ C999 ' print map of motor number to name
 	PRINT("MOTOR #", QFWHEEL_UPPER, " FWHEEL_UPPER", #13)
 	
 RETURN
+

@@ -11,7 +11,7 @@
 #include "gb_serial.h"
 
 #define error_message printf
-
+#define NMOTORS 7
 const char * STATUS_CODES[4][16] = {
 	{
 		"Drive Ready",
@@ -90,8 +90,18 @@ const char * STATUS_CODES[4][16] = {
 
 };
 
-int
-set_interface_attribs (int fd, int speed, int parity)
+/*############################################################################
+#  Title: set_interface_attribs
+#  Author: C.Johnson
+#  Date: 9/9/19
+#  Args:  int fd -> tty port file descriptor
+#	  int speed -> serial speed
+#	  int polarity -> serial polarity
+#  Returns: 0 on success, non zero on failure
+#  Description: setup tty port serial attibutes for port referred to  by fd
+#
+#############################################################################*/
+int set_interface_attribs (int fd, int speed, int parity)
 {
         struct termios tty;
         memset (&tty, 0, sizeof tty);
@@ -131,8 +141,17 @@ set_interface_attribs (int fd, int speed, int parity)
         return 0;
 }
 
-void
-set_blocking (int fd, int should_block)
+/*############################################################################
+#  Title: set_blocking
+#  Author: C.Johnson
+#  Date: 9/9/19
+#  Args:  int fd -> tty port file descriptor
+#	  int should_block -> 1 for blocking, 0 for non blocking
+#  Returns: N/A
+#  Description: setup tty port blocking attribute for port referred to  by fd
+#
+#############################################################################*/
+void set_blocking (int fd, int should_block)
 {
         struct termios tty;
         memset (&tty, 0, sizeof tty);
@@ -163,33 +182,19 @@ int open_port( char usbport[] )
 
 	char serialfix = 128;
 
-
-	/*fd = open(usbport, O_RDWR | O_NOCTTY | O_NDELAY);
-	fcntl(fd, F_SETFL, FNDELAY);
-	if (fd == -1)
-	{
-		//Could not open the port.
-		perror("open_port: Unable to open port");
-	}
-
-
-	else
-		fcntl(fd, F_SETFL, 0);*/
-
-
+	
 	fd = open (usbport, O_RDWR | O_NOCTTY | O_SYNC);
 	if (fd < 0)
 		{
-        	error_message ("error %d opening %s: %s", errno, usbport, strerror (errno));
-        	return (fd);
+   		error_message ("error %d opening %s: %s", errno, usbport, strerror (errno));
+      	return (fd);
 		}	
 
 	set_interface_attribs (fd, B9600, 0);  // set speed to 9600 bps, 8n1 (no parity)
 	set_blocking (fd, 0);                // set no blocking
 	
-  // this is necessary, not sure why.
-	write (fd, &serialfix, 1);           // send 1 character greeting
-
+	// this is necessary, not sure why.
+	moog_write(fd, &serialfix);
 	
 	
 	return (fd);
@@ -219,6 +224,22 @@ int moog_write( int rs485_fd, const char *msg )
 	write( rs485_fd, send_buffer, strlen(send_buffer) );
 }
 
+/********************************************************
+ * Name: moog_read
+ * args: rs485_fd-> filedescriptor for serial port
+ *       resp -> pointer to char array to be filled
+ *       with data from the serial port
+ * Descr: Read one line of data from (ending in \n or \r)
+ *          and put that data in the resp char array.
+ *          The serial line is non blocking 
+ *          this function should probably be called
+ *          moog_readline, but alas it is not.
+ * 
+ *
+ * -Scott Swindell September 2019
+ *
+ *
+ * ****************************************************/
 
 int moog_read( int rs485_fd, char resp[] )
 {
@@ -237,10 +258,10 @@ int moog_read( int rs485_fd, char resp[] )
 		if(select( rs485_fd+1, &set, NULL, NULL, &timeout ) == 1)
 		{
 			rn = read(rs485_fd, resp+ii, 1);
-			printf("%i %c\n", ii, resp[ii]);
-			if(resp[ii] == '\r')
+			//printf("%i %c\n", ii, resp[ii]);
+			if(resp[ii] == '\r' || resp[ii] == '\n')
 			{
-				resp[ii] = '\0';
+				resp[ii+1] = '\0';
 				return 0;// finished line
 			}
 			ii++;
@@ -289,6 +310,7 @@ int moog_init(int rs485_fd )
 
 	moog_write(rs485_fd, "Z:0"); //reset all nodes
 	sleep(1);
+	moog_write(rs485_fd, "ddd=0" ); // Turn debug off
 	moog_write(rs485_fd, "GOSUB(0)" ); // start head node
 	usleep(200000);
 
@@ -309,7 +331,7 @@ int moog_init(int rs485_fd )
  * Description:
  * 		Send a home command to a motor. For the 
  * 		linear stages this is the subroutine
- * 		100 for the filter wheels it is 
+ * 		100  for the filter wheels it is 
  * 		101. 
  *
  *
@@ -318,10 +340,13 @@ int moog_home( int rs485_fd, int can_addr )
 {
 	switch(can_addr)
 	{
+		case -1: //Home all in series
+			 moog_callsub( rs485_fd, 100, can_addr );
 		case OFFSET_X:
 		case OFFSET_Y:
 		case OFFSET_FOCUS:
-			moog_callsub( rs485_fd, 100, can_addr );
+		case OFFSET_MIRRORS:
+			moog_callsub( rs485_fd, 102, can_addr );
 		break;
 		default:
 			printf("Motor %i can not be homed yet", can_addr);
@@ -353,7 +378,8 @@ int moog_lgoto(int rs485_fd, int can_addr, int pos )
 	snprintf( msg, 40, "PT:%i=%i", can_addr, pos );
 	moog_write(rs485_fd, (const char *) msg);
 	usleep(100); // this is probably not necessary
-	moog_write(rs485_fd, "G"); //GO!
+	snprintf(msg, 40, "G:%i", can_addr );
+	moog_write(rs485_fd, (const char *) msg ); //GO!
 
 	return 0;
 }
@@ -408,21 +434,118 @@ int moog_fgoto( int rs485_fd, int can_addr, int fnum )
  * ***************************/
 int moog_getstatus(int rs485_fd, MSTATUS* stat)
 {
-	char msg[10];
+	char msg[20];
 	char resp[READSIZE];
 	int error;
+
+	moog_read(rs485_fd, resp);//flush--probably unecessary
+
+	snprintf(msg, 20, "RPA:%i", stat->motor_num);
+	moog_write(rs485_fd, (const char *) msg );
+	if( moog_read(rs485_fd, resp) == 0)
+	{
+		stat->pos = atoi(resp);
+	}
+	else
+		return -1;
+	
+	snprintf(msg, 20, "Rf:%i", stat->motor_num);
+	moog_write(rs485_fd, (const char *) msg );
+	if( moog_read(rs485_fd, resp) == 0)
+	{
+		stat->fnum = atoi(resp);
+	}
+	else
+		return -1;
+
 	for(int ii=0; ii<4; ii++)
 	{
-
-		snprintf( msg, 10, "RW(%i):%i", ii, stat->motor_num );
+		snprintf( msg, 20, "RW(%i):%i", ii, stat->motor_num );
 		moog_write( rs485_fd, (const char *) msg );
 		error = moog_read(rs485_fd, resp);
 		stat->words[ii] = atoi(resp);
 
 	}
-	
+
+	snprintf( msg, 20, "RW(16):%i", stat->motor_num );
+	moog_write(rs485_fd, (const char *) msg );
+	if( moog_read(rs485_fd, resp) == 0)
+    {
+		stat->iobits = atoi(resp);
+    }
+	else
+	{
+		fprintf(stderr, "Could not determine homed status of %s check msg %s\n", stat->name, msg);
+		return -1;
+	}
+
+
+	snprintf( msg, 20, "RW(12):%i", stat->motor_num );
+	moog_write(rs485_fd, (const char *) msg );
+	if( moog_read(rs485_fd, resp) == 0)
+    {
+		stat->userbits = atoi(resp);
+        stat->isHomed = stat->iobits & 1;
+    }
+	else
+	{
+		fprintf(stderr, "Could not determine homed status of %s check msg %s\n", stat->name, msg);
+		return -1;
+	}
+
+
+	switch(stat->motor_num)
+	{
+		case OFFSET_FWHEEL:
+			stat->isFilter = 1;
+		break;	
+		case FWHEEL_LOWER:
+			stat->isFilter = 1;
+		break;
+		case FWHEEL_UPPER:
+			stat->isFilter = 1;
+		break;
+		default:
+			stat->isFilter = 0;
+
+	}
+	return 0;
 }
 
+
+int moog_getallstatus(int rs485_fd, MSTATUS stat[])
+{
+	int active;
+	char msg[10];
+	char resp[READSIZE];
+	snprintf(msg, 10, "RW(12)");
+	moog_write(rs485_fd, (const char *) msg );
+	if( moog_read(rs485_fd, resp) == 0)
+	{
+		active = atoi(resp);
+	}
+	else
+	{
+		fprintf(stderr, "WE could not get active status\n");
+		return -1;
+	}
+
+	for(MSTATUS *motor=stat; motor!=stat+NMOTORS; motor++)
+	{
+		
+		
+		if((1<<motor->motor_num) & active)
+		{
+			//TODO error check this response.
+			moog_getstatus(rs485_fd, motor);
+			motor->isActive = 1;
+		}
+		else
+			motor->isActive = 0;
+	
+	}
+	return active;
+}
 
 /**********************************
  * Name: print_status
@@ -436,7 +559,8 @@ int moog_getstatus(int rs485_fd, MSTATUS* stat)
 void print_status(MSTATUS stat)
 {
 	printf("Motor %i %s:\n", stat.motor_num, stat.name);
-
+	printf("  Pos == %i\n", stat.pos);
+	printf("  fnum == %i\n", stat.fnum);
 	//report the first 4 status words
 	for( int word_ii=0; word_ii<4; word_ii++ )
 	{
@@ -449,6 +573,7 @@ void print_status(MSTATUS stat)
 			}
 		}
 	}
+
 	printf("\n\n");
 }
 
@@ -463,7 +588,9 @@ void print_status(MSTATUS stat)
  * 		to get a list of all the motor names 
  * 		and their numbers from from the serial 
  * 		line. This information is then stored 
- * 		in the array of status structs. 
+ * 		in the array of status structs. This
+ * 		is how the GUI maps the can address 
+ *		(motor_num) to the name of the motor.
  *
  *
  *
@@ -473,29 +600,29 @@ int build_stat_structs( int rs485_fd, MSTATUS motors[] )
 	char resp[READSIZE];
 	moog_read(rs485_fd, resp); //flush line
 	int wc;
-	moog_callsub(rs485_fd, 999, -1);
-
-	moog_read( rs485_fd, resp);
-	wc = sscanf(resp, "MOTOR #%i %s", &motors[0].motor_num, motors[0].name );
+	moog_callsub(rs485_fd, 999, -1 );
 	
+	moog_read( rs485_fd, resp );
+	wc = sscanf(resp, "MOTOR #%i %s", &motors[0].motor_num, motors[0].name );
 
-	moog_read( rs485_fd, resp);
+	moog_read( rs485_fd, resp );
 	wc = sscanf(resp, "MOTOR #%i %s", &motors[1].motor_num, motors[1].name );
 
 	moog_read( rs485_fd, resp);
 	wc = sscanf(resp, "MOTOR #%i %s", &motors[2].motor_num, motors[2].name );
 
-	moog_read( rs485_fd, resp);
+	moog_read( rs485_fd, resp );
 	wc = sscanf(resp, "MOTOR #%i %s", &motors[3].motor_num, motors[3].name );
 	
-	moog_read( rs485_fd, resp);
+	moog_read( rs485_fd, resp );
 	wc = sscanf(resp, "MOTOR #%i %s", &motors[4].motor_num, motors[4].name );
 
-	moog_read( rs485_fd, resp);
+	moog_read( rs485_fd, resp );
 	wc = sscanf(resp, "MOTOR #%i %s", &motors[5].motor_num, motors[5].name );
 
-	moog_read( rs485_fd, resp);
+	moog_read( rs485_fd, resp );
 	wc = sscanf(resp, "MOTOR #%i %s", &motors[6].motor_num, motors[6].name );
+
 }
 
 

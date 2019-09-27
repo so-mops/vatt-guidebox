@@ -19,8 +19,11 @@
  #include <time.h>
 
  #include "gb_commands.h"
+ 
 
 void domessage(char *av0, char *message);
+void displayTelem(int ttyfd);
+
 
 /*############################################################################
 #  Title: main
@@ -34,9 +37,9 @@ int main(int argc, char ** argv)
 {
 	char strPort[100], strAxis[20];
 	int doinit=0, dohome=0, domove=0, dohelp=0;
-	int value=0, opt, iaxis, ttyfd, isFilter=0;
+	int value=0, opt, iaxis, ttyfd, isFilter=0, test;
 	int axisinit=0, portinit=0, valinit=0, dotelem=0;
-
+	char resp[10000];
 	while ((opt = getopt(argc, argv, "p:ihmta:tv:?")) != -1) 
 		{
                	switch (opt) 
@@ -47,6 +50,7 @@ int main(int argc, char ** argv)
                    		break;
                		case 'i': //Initialize
                    		doinit = 1;
+
                   		break;
                		case 'h': //home
                    		dohome = 1;
@@ -108,7 +112,7 @@ int main(int argc, char ** argv)
 	//grab telemetry
 	if(dotelem)
 		{
-		doTelemetry(ttyfd);
+		displayTelem(ttyfd);
 		ttyClose( ttyfd );
 		exit(0);
 		}
@@ -148,7 +152,8 @@ int main(int argc, char ** argv)
 			domessage(argv[0], "ERROR!!!  Must specify valid axis and value");
 			}
 		printf("MOVING %s to %i!!!\n", strAxis, value);
-		stageGoTo(ttyfd, strAxis, value);
+		test=stageGoTo(ttyfd, strAxis, value);
+		printf("moved stage %i\n", test);
 		}
 	else
 		{
@@ -157,6 +162,39 @@ int main(int argc, char ** argv)
 	ttyClose( ttyfd );
 		
 
+}
+
+/*############################################################################
+#  Title: displayTelemetry(char *av0, char *message)
+#  Author: C.Johnson
+#  Date: 9/4/19
+#  Args:  char *av0 = pointer to name of command issued to start program
+#	char *message = optional message to append to beginning
+#  Description: prints the help message
+#
+#############################################################################*/
+void displayTelem(int ttyfd)
+{
+MSTATUS allmotors[7];
+
+int ix,ix2;
+	doTelemetry(ttyfd, allmotors, 1);
+	for(ix=0;ix<7;ix++)
+		{
+		printf("******Stage %i*******\n", ix);
+		printf("\tactive=%i\n",allmotors[ix].isActive);
+		for(ix2=0;ix2<4;ix2++)
+			{
+			printf("\t\twords[%i]=%i\n", ix2, allmotors[ix].words[ix2]);
+			}
+		printf("\tuserbits=%i\n", allmotors[ix].userbits);
+		printf("\tmotor_num=%i\n", allmotors[ix].motor_num);
+		printf("\tpos=%i\n", allmotors[ix].pos);
+		printf("\tname=%s\n", allmotors[ix].name);
+		printf("\tfnum=%i\n", allmotors[ix].fnum);
+		}
+		
+		
 }
 
 /*############################################################################
