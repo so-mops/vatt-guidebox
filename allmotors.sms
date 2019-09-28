@@ -16,20 +16,18 @@
 #define QFWHEEL_UPPER "7"
 
 
-
 #define OFFSET_X_OK B(12, OFFSET_X)
 #define OFFSET_Y_OK B(12, OFFSET_Y)
 #define OFFSET_FOCUS_OK B(12, OFFSET_FOCUS)
 #define OFFSET_MIRRORS_OK B(12, OFFSET_MIRRORS)
 #define OFFSET_FWHEEL_OK B(12, OFFSET_FWHEEL)
 #define FWHEEL_LOWER_OK B(12, FWHEEL_LOWER)
-
 #define FWHEEL_UPPER_OK B(12, FWHEEL_UPPER)
 
 
 #define HEAD_NODE hhh
 #define HOME 100
-#define HOME_SENSOR IN(10)
+
 #define MAXVii 0 ' Index of the MAXV in array
 #define ACCELii 1 ' Index of accel in array
 
@@ -40,7 +38,6 @@
 #define NEG_LIMIT_RT Bm ' Real time negative limit
 #define POS_LIMIT_RT Bp ' Real time positive limit
 #define NEG_LIMIT_HIST Bl ' Historical negative limit
-
 #define POS_LIMIT_HIST Br ' Historical positive limit
 
 #define NEG_MSWITCH_POS nnn 'Position of negative mechanical limit switch
@@ -57,11 +54,16 @@
 #define SET_HOMED_BIT US(0)
 #define GET_HOMED_BIT B(12,0)
 
-#define TURN_ON_HOMING_IRLED OS(0)
-#define TURN_OFF_HOMING_IRLED OR(0)
+#define TURN_ON_HOMING_IRLED OS(4) OS(5)
+#define TURN_OFF_HOMING_IRLED OR(4) OR(5)
+#define GET_HOMING_SENSOR IN(0) 
+#define GET_FILTER_SENSOR IN(1)
 
 #define ENGAGE_SOLENOID OS(1)
 #define RELEASE_SOLENOID OR(1)
+#define HOME_SENSOR IN(1)
+#define FILTER_SENSOR IN(0)
+
 
 #define SET_NODE_READY US(14)
 #define GET_NODE_READY B(12, 14)
@@ -211,6 +213,7 @@ C103 ' Home assuming the home sensor is only active at the index (edge detection
 		WHILE HOME_SENSOR == c 
 		' Wait till homing sensor state changes
 		' and record position of home sensor
+			BREAK
 			b=PA
 		LOOP
 		
@@ -247,7 +250,7 @@ C102 ' Home assuming the home sensor is only active at the index (edge detection
 	' 6. Set the homed bit
 	' 7. Enable software limits
 	' 8. Turn off home optical sensor
-
+	IF DEBUG == 1 PRINT("FILTER HOME CALLED", #13) ENDIF 
 	IF READY == 1 ' We don't home if the motor isn't ready.
 		
 		IF DEBUG == 1 PRINT("HOMING MOTOR", #13) ENDIF
@@ -259,45 +262,50 @@ C102 ' Home assuming the home sensor is only active at the index (edge detection
 		IF CADDR == FWHEEL_LOWER RELEASE_SOLENOID
 		ELSEIF CADDR == FWHEEL_UPPER RELEASE_SOLENOID
 		ENDIF
-		
+		'TODO: we need to detect whether or not the 
+		'	solenoid actually released.
+
 		MV
-		VT=MAXV
-		G TWAIT
-		
-		
-		Zr
-		c=HOME_SENSOR ' capture homing sensor state
-		' Here is were we would turn on optical home LED
-		
-		VT=-MAXV
+		VT=MAXV/5
 		G
-		WHILE HOME_SENSOR == c 
+
+		
+		WHILE 1 
 		' Wait till homing sensor state changes
 		' and record position of home sensor
-			b=PA
+			IF HOME_SENSOR == 0
+				IF DEBUG == 1 PRINT("HOME SENSOR TRIPPED", #13) ENDIF
+				IF FILTER_SENSOR == 0
+					IF DEBUG == 1 PRINT("FILTER SENSOR TRIPPED", #13) ENDIF
+					b=PA
+					BREAK
+					
+				ENDIF
+			ENDIF
 		LOOP
 		
 		X TWAIT
-
+		IF DEBUG == 1 PRINT("HOME IS AT ", b,  #13) ENDIF
 		' Move to home sensor position
 		MP
 		PT=b
 		G TWAIT
-		O=0 ' Set home sensor position at 0
+
+		O=0 ' Set origin at the home sensor position
 		SET_HOMED_BIT
 
 		IF CADDR == FWHEEL_UPPER ENGAGE_SOLENOID
 		ELSEIF CADDR == FWHEEL_LOWER ENGAGE_SOLENOID
 		ENDIF
 		
-		TURN_ON_HOMING_IRLED
+		TURN_OFF_HOMING_IRLED
+		'OFF 'we will uncomment this when the solenoid is put in place
 		IF DEBUG == 1 PRINT("MOTOR HOMED", #13) ENDIF
 	ELSE
 		IF DEBUG == 1 PRINT("MOTOR NOT READY") ENDIF
 	ENDIF
 
 RETURN
-
 
 C101 'HOME at the limits'
 	SLD
@@ -367,7 +375,6 @@ C100 ' Home all the motors in series
 	ENDIF
 
 RETURN
-
 
 C110 'Get out of limit
 	'Algorithm:
@@ -548,7 +555,7 @@ C0  ' Startup stuff the head node motor
 	ENDIF
 
 	Zs
-	MAXV:OFFSET_FWHEEL = 20000
+	MAXV:OFFSET_FWHEEL = 5000
 	ACCEL:OFFSET_FWHEEL = 2
 	DECEL:OFFSET_FWHEEL = 2
 	FILTER_DIST:OFFSET_FWHEEL = 1630
@@ -561,7 +568,7 @@ C0  ' Startup stuff the head node motor
 	ENDIF
 
 	Zs
-	MAXV:FWHEEL_UPPER = 20000
+	MAXV:FWHEEL_UPPER = 5000
 	ACCEL:FWHEEL_UPPER = 2
 	DECEL:FWHEEL_UPPER = 2
 	FILTER_DIST:FWHEEL_UPPER =1630
@@ -578,7 +585,7 @@ C0  ' Startup stuff the head node motor
 		PRINT("COMMAD ERROR", #13)
 		WAIT=3000
 	LOOP
-	MAXV:FWHEEL_LOWER = 20000
+	MAXV:FWHEEL_LOWER = 5000
 	ACCEL:FWHEEL_LOWER = 2
 	DECEL:FWHEEL_LOWER = 2
 	FILTER_DIST:FWHEEL_LOWER = 1630
@@ -597,14 +604,82 @@ C400 ' go to filter
 	
 	MP
 	IF f >= 0
-
-		IF f < 7
+		IF f < 5
 			PT = f * FILTER_DIST
+			TURN_ON_HOMING_IRLED
 			RELEASE_SOLENOID
+			' TODO: we need to verify the solenoid released.
 			G TWAIT
+			
+			
+			IF FILTER_SENSOR == 0
+				IF DEBUG PRINT("WE are on the filter!", #13) ENDIF
+			ENDIF
+			TURN_OFF_HOMING_IRLED
 			ENGAGE_SOLENOID
+			
+			OFF
 		ENDIF
+	ENDIF
+RETURN
 
+C1 ' All nodes startup
+	' This subroutine is meant to be run by all nodes
+
+	xxx = 1
+
+	WHILE  GET_NODE_READY == 0
+		WAIT=500 ' Dont flood the can bus
+	LOOP
+	xxx = 2
+	IF CADDR == HEAD_NODE
+		PRINT( "Starting setup for all motors", #13 )
+	ENDIF
+	xxx = 3
+	VT=MAXV
+	AT=ACCEL
+	DT=DECEL
+
+	xxx = 4
+	
+	EPTR=EEP_SOFTWARE_LIMIT	
+	VLD(NEG_SLIMIT, 1)
+	xxx = 5
+	EPTR=EEP_SOFTWARE_LIMIT+4
+	VLD(POS_SLIMIT, 1)
+
+	xxx=6
+	IF NEG_SLIMIT == 0
+		SLD
+		IF DEBUG == 1 PRINT("SLIMIT not in EEPROM, Disabling 1", #13 ) ENDIF
+	ELSEIF POS_SLIMIT ==  0
+		SLD
+		IF DEBUG == 1 PRINT("SLIMIT not in EEPROM, Disabling 2", #13 ) ENDIF
+	ELSEIF POS_SLIMIT == NEG_SLIMIT
+		SLD
+		IF DEBUG == 1 PRINT("SLIMIT not in EEPROM, Disabling 2", #13 ) ENDIF
+	
+	ELSE
+		SLN=NEG_SLIMIT
+		SLP=POS_SLIMIT
+		SLE
+	ENDIF
+	xxx=7
+RETURN
+
+C55 ' Clear the command error
+	Zs
+	WHILE Bs == 1 
+		IF DEBUG == 1 PRINT("Clearing command error.", #13) ENDIF
+		WAIT=1000
+	LOOP
+RETURN	
+
+
+
+
+C50 ' Attempt to find spare
+RETURN
 C998 'Send square wave to LED on optical switch'
 	WHILE 1
 		OR(4)
@@ -613,7 +688,6 @@ C998 'Send square wave to LED on optical switch'
 		WAIT=1000
 	LOOP
 RETURN
-
 
 
 C999 ' print map of motor number to name
@@ -627,4 +701,3 @@ C999 ' print map of motor number to name
 	PRINT("MOTOR #", QFWHEEL_UPPER, " FWHEEL_UPPER", #13)
 	
 RETURN
-
