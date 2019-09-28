@@ -56,7 +56,8 @@
  { 
  int ttyfd;
   
-	ttyfd = open_port( ttyPort );
+	//ttyfd = open_port( ttyPort );
+	ttyfd = open_port_net( "10.130.133.24", 10001 );
 	return ttyfd;
       
  }

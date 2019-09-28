@@ -30,6 +30,7 @@ typedef struct
 
 /* function prototypes */
 int open_port( char usbport[] );
+int open_port_net( char *, short );
 int close_port( int fd );
 int moog_write( int rs485_fd, const char *msg );
 int moog_read( int rs485_fd, char resp[] );

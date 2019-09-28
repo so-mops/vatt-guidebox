@@ -7,6 +7,18 @@
 #include <stdlib.h>
 #include <sys/select.h>
 #include <sys/types.h>
+#include <netdb.h> 
+#include <stdio.h> 
+#include <stdlib.h> 
+#include <string.h> 
+#include <sys/socket.h> 
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
+#define MAX 80 
+#define PORT 10001
+#define LANTRONIX "10.130.133.24" 
+#define SA struct sockaddr 
 
 #include "gb_serial.h"
 
@@ -89,6 +101,61 @@ const char * STATUS_CODES[4][16] = {
 	}
 
 };
+
+/*############################################################################
+#  Title: open_port_net()
+#  Author: C.Johnson
+#  Date: 9/9/19
+#  Args: 
+#  Returns: 
+#
+#############################################################################*/
+int open_port_net(char *host, short port) 
+{ 
+int sockfd, connfd;
+char serialfix=128; 
+struct sockaddr_in servaddr, cli; 
+  
+	// socket create and varification 
+	sockfd = socket(AF_INET, SOCK_STREAM, 0); 
+	if (sockfd == -1) 
+		{ 
+		printf("socket creation failed...\n"); 
+		exit(0); 
+		} 
+	else
+	
+	printf("Socket successfully created..\n"); 
+	bzero(&servaddr, sizeof(servaddr)); 
+  
+	// assign IP, PORT 
+	servaddr.sin_family = AF_INET; 
+	servaddr.sin_addr.s_addr = inet_addr(host); 
+	servaddr.sin_port = htons(port); 
+  
+	// connect the client socket to server socket 
+	if (connect(sockfd, (SA*)&servaddr, sizeof(servaddr)) != 0) 
+		{ 
+		printf("connection with the server failed...\n"); 
+		exit(0); 
+		} 
+	else
+		printf("connected to the server..\n"); 
+
+	int status = fcntl(sockfd, F_SETFL, fcntl(sockfd, F_GETFL, 0) | O_NONBLOCK);
+
+	if (status == -1)
+		{
+		perror("calling fcntl");
+		// handle the error.  By the way, I've never seen fcntl fail in this way
+		}
+
+	moog_write(sockfd, &serialfix);//
+	
+
+	return sockfd;
+  
+} 
 
 /*############################################################################
 #  Title: set_interface_attribs
