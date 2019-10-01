@@ -63,6 +63,7 @@ static void fillMotors();
 		
 //global memory for IText properties
 char gttyPORT[20];
+char gnetwork[20];
 char gstatusString[7][1000];
 // main connection switch
 static ISwitch connectS[] = {
@@ -88,8 +89,20 @@ static IText stdTelemT[] = {{"foc", "Focus Position "       , stdTelem.offfoc, 0
 			
 static ITextVectorProperty stdTelemTP = {  mydev, "stTELEM", "Guider Telemetry",  MAIN_GROUP , IP_RO, 0, IPS_IDLE,  stdTelemT, NARRAY(stdTelemT), "", 0};
 
+// connection type switch
+static ISwitch comTypeS[] = {
+	 {"NETWORK",  "Network",  ISS_ON, 0, 0},
+         {"SERIAL",  "Serial",  ISS_OFF, 0, 0}
+	 };
+static ISwitchVectorProperty comTypeSP = { mydev, "COMTYPE", "Connection Type",  MAIN_GROUP, IP_RW, ISR_1OFMANY, 0, IPS_IDLE,  comTypeS, NARRAY(comTypeS), "", 0 };
+
+
+static IText networkT[] =  {{"NETWORK", "Net", "10.130.133.24:10001", 0, 0, 0}};
+static ITextVectorProperty networkTP = {  mydev, "NET", "Guider Network Information",  ENG_GROUP , IP_RW, 0, IPS_IDLE,  networkT, NARRAY(networkT), "", 0};
+
 static IText ttyPortT[] =  {{"TTYport", "TTY Port", "/dev/ttyUSB0", 0, 0, 0}};
 static ITextVectorProperty ttyPortTP = {  mydev, "COM", "Guider Communication",  ENG_GROUP , IP_RW, 0, IPS_IDLE,  ttyPortT, NARRAY(ttyPortT), "", 0};
+
 
 static IText motorStatusT[] = {
 	{"M1", "Motor 1", "", 0, 0, 0},
@@ -207,6 +220,12 @@ char rawCmdString[50];
 /********Telemetry***********/
         IDDefSwitch (&connectSP, NULL);
         IDDefSwitch (&engSwitchSP, NULL);
+
+		IDDefSwitch (&comTypeSP, NULL);
+
+		IDDefText(&networkTP, NULL);
+		networkTP.tp[0].text = gnetwork;
+
 		IDDefText(&ttyPortTP, NULL);
 		ttyPortTP.tp[0].text = gttyPORT;
 
@@ -217,6 +236,7 @@ char rawCmdString[50];
 
 		//TODO this should be read from a config file.
 		strcpy(ttyPortTP.tp[0].text, "/dev/ttyUSB0");
+		strcpy(networkTP.tp[0].text, "10.130.133.24:10001");
 		/*
 		IDDefText(&motorStatusTP, NULL);
 		motorStatusTP.tp[0].text = gstatusString[0];
@@ -278,6 +298,7 @@ char rawCmdString[50];
 	IDMessage(mydev, "ISNewText called [%s], %li", texts[0], sizeof(texts[0]));
 	char septext[30];
 	char respbuff[100];
+
 	if( !strcmp(name, "COM") )
 	{
 		
@@ -480,7 +501,14 @@ void ISNewSwitch (const char *dev, const char *name, ISState *states, char *name
 	if (strcmp (dev, mydev))
 		return;
 	
-         
+       if (!strcmp (name, comTypeSP.name)) {
+             /* change comm type */
+             /* Check comTypeSP, if it is idle, then return */
+             
+	     
+             return;
+	    }
+	
 	if (!strcmp(name, connectSP.name))
 	{
 		sp = IUFindSwitch (&connectSP, names[0]);
@@ -494,7 +522,10 @@ void ISNewSwitch (const char *dev, const char *name, ISState *states, char *name
 				//sp->s = states[0];
 				connectS[0].s = ISS_ON;
 				//connectS[1].s = ISS_OFF;
-				RS485_FD = ttyOpen(ttyPortT[0].text);
+				//RS485_FD = ttyOpen(ttyPortT[0].text);
+				//RS485_FD = net_ttyOpen("10.130.133.24:10001");
+				IDMessage(mydev, "networkT[0].text=%s", networkT[0].text);
+				RS485_FD = net_ttyOpen(networkT[0].text);
 				if (RS485_FD > 0)
 				{
 					connectS[0].s = ISS_ON;

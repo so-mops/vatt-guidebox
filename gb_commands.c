@@ -43,6 +43,47 @@
  }
 
 /*############################################################################
+#  Title: net_ttyOpen
+#  Author: C.Johnson
+#  Date: 10/1/19
+#  Args:  char *netinfo -> string containing address and (optionally) port
+#  Returns: file descriptor of open socket
+#  Description: parses the string pointed to by netinfo.  if a ":" exists, it
+#	will use that to delimit address:port.  otherwise it will just
+#	assume its an address.  This will call open_port_net and get an file
+#	descriptor to return.  Intended for use with a lantronix
+#
+#############################################################################*/
+int net_ttyOpen (char *netinfo)
+{ 
+int port=10001, netfd;
+char input[50], *address, *portstr;
+
+	//so we don't destroy the original string    
+	sprintf(input, "%s", netinfo);
+	//sprintf(input, "10.130.133.24:10001");
+ 
+	//get the address
+	address = strtok(input, ":"); 
+	if (address == NULL)
+		{
+		return 0;
+		}
+	//get the port(if it exists or is valid
+	portstr = strtok(NULL, ":"); 
+	if (portstr != NULL)
+		{
+		port=atoi(portstr);
+		if (port==0)
+			port=10001;
+		}
+	netfd = open_port_net( address, port );
+	//netfd = open_port_net( "10.130.133.24", 10001 );
+	return netfd; 
+    
+ }
+
+/*############################################################################
 #  Title: ttyOpen
 #  Author: C.Johnson
 #  Date: 9/9/19
@@ -56,8 +97,7 @@
  { 
  int ttyfd;
   
-	//ttyfd = open_port( ttyPort );
-	ttyfd = open_port_net( "10.130.133.24", 10001 );
+	ttyfd = open_port( ttyPort );
 	return ttyfd;
       
  }
