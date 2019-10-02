@@ -100,7 +100,7 @@ static ISwitch comTypeS[] = {
 static ISwitchVectorProperty comTypeSP = { mydev, "COMTYPE", "Connection Type",  ENG_GROUP, IP_RW, ISR_1OFMANY, 0, IPS_IDLE,  comTypeS, NARRAY(comTypeS), "", 0 };
 
 static ISwitch resetLtxS[] = {{"RESET_LTX",  "Reset Lantronix",  ISS_OFF, 0, 0},};
-static ISwitchVectorProperty resetLtxSP = { mydev, "lTXRESET", "Lantronix",  ENG_GROUP, IP_RW, ISR_1OFMANY, 0, IPS_IDLE,  resetLtxS, NARRAY(resetLtxS), "", 0 };
+static ISwitchVectorProperty resetLtxSP = { mydev, "lTXRESET", "Lantronix",  ENG_GROUP, IP_RW, ISR_NOFMANY, 0, IPS_IDLE,  resetLtxS, NARRAY(resetLtxS), "", 0 };
 
 
 static IText networkT[] =  {{"NETWORK", "Net", "10.130.133.24:10001", 0, 0, 0}};
@@ -499,108 +499,57 @@ char rawCmdString[50];
 #############################################################################*/
 void ISNewSwitch (const char *dev, const char *name, ISState *states, char *names[], int n)
 {
-	ISwitch *sp;
- 	int i, err;
-	char ret[20]; 
-	ISState state;	
-	int isDifferent;
-	char respbuffer[50];
+ISwitch *sp;
+int i, err;
+char ret[20]; 
+ISState state;	
+int isDifferent;
+char respbuffer[50];
 
 	/* ignore if not ours */
 	if (strcmp (dev, mydev))
 		return;
 	else if (! strcmp(name, comTypeSP.name))
-	{
-		for (i = 0; i < n; i++) 
 		{
-			
-			/* Find switches with the passed names in the initSP property */
-			sp = IUFindSwitch (&comTypeSP, names[i]);
-			state = states[i];
-			isDifferent = state != sp->s;
-			if(!isDifferent)// no need to update. 
-				continue;
-			/*  init  */ 
-			if (sp == &comTypeS[0]) 
+		IUUpdateSwitch(&comTypeSP, states, names, n);
+		comTypeSP.s = IPS_BUSY;
+		if (comTypeS[0].s == ISS_ON)
 			{
-				if (state == ISS_ON)
-				{
-					IDMessage(mydev, "Changing COM to Network");
-					gcomtype = NET; 
-					comTypeS[0].s=ISS_ON;
-					comTypeS[0].s=ISS_OFF;
-					
-				}
-				else
-				{
-
-				}
+			gcomtype = NET; 
+			IDMessage(mydev, "Changing COM to Network");
+		
 			}
-			
-			 
-			/*  home  */ 
-			else if (sp == &comTypeS[1]) 
+		else if (comTypeS[1].s == ISS_ON)
 			{
-				if (state == ISS_ON)
-				{
-					IDMessage(mydev, "Changing COM to Serial");
-					gcomtype = SER;
-					comTypeS[0].s=ISS_OFF;
-					comTypeS[0].s=ISS_ON;
-					
-				}
-				else
-				{
-
-				}
-				  
+			gcomtype = SER;
+			IDMessage(mydev, "Changing COM to Serial");
 			}
-			 
-			/*  auto  */ 
-				comTypeSP.s = IPS_IDLE;
-					 
-			//IUResetSwitch(&comTypeSP);
-			//IDSetSwitch(&comTypeSP, NULL);
-	 
-		} /* end for */
+		comTypeSP.s = 0;
+		IDSetSwitch(&comTypeSP, NULL);
+			
+            return;
+		
 	}
 
 	else if (! strcmp(name, resetLtxSP.name))
-	{
-		for (i = 0; i < n; i++) 
 		{
-			
-			/* Find switches with the passed names in the initSP property */
-			sp = IUFindSwitch (&resetLtxSP, names[i]);
-			state = states[i];
-			isDifferent = state != sp->s;
-			if(!isDifferent)// no need to update. 
-				continue;
-			/*  init  */ 
-			if (sp == &resetLtxS[0]) 
-			{
-				if (state == ISS_ON)
-				{
-					IDMessage(mydev, "resetting lantronix");
-					lantronix_reset(networkT[0].text);
-					resetLtxS[0].s=ISS_ON;
-					
-					
-				}
-				else
-				{
-
-				}
-			}
-			
-			 
-			resetLtxSP.s = IPS_IDLE;
-					 
-			IUResetSwitch(&resetLtxSP);
-			//IDSetSwitch(&comTypeSP, NULL);
-	 
-		} /* end for */
-	}
+		IUUpdateSwitch(&resetLtxSP, states, names, n);
+		resetLtxSP.s = IPS_BUSY;
+		if (resetLtxS[0].s == ISS_ON)
+            		{
+			resetLtxS[0].s = ISS_OFF;
+                	IDSetSwitch(&resetLtxSP, "lantronix is resetting.");
+			lantronix_reset(networkT[0].text);
+			resetLtxSP.s = 0;
+	    		IDSetSwitch(&resetLtxSP, "Lantronix Reset Complete");
+            		}
+            	else
+                	IDSetSwitch(&resetLtxSP, "false trigger.");
+	    
+		return;
+		 
+				 
+		}
 	
 	else if (!strcmp(name, connectSP.name))
 	{
@@ -616,10 +565,10 @@ void ISNewSwitch (const char *dev, const char *name, ISState *states, char *name
 				connectS[0].s = ISS_ON;
 				//connectS[1].s = ISS_OFF;
 				//IDMessage(mydev, "networkT[0].text=%s", networkT[0].text);
-				//if (gcomtype == NET)
+				if (gcomtype == NET)
 					RS485_FD = net_ttyOpen(networkT[0].text);
-				//else
-				//	RS485_FD = ttyOpen(ttyPortT[0].text);
+				else
+					RS485_FD = ttyOpen(ttyPortT[0].text);
 				if (RS485_FD > 0)
 				{
 					connectS[0].s = ISS_ON;

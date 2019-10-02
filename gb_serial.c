@@ -331,7 +331,8 @@ int open_port( char usbport[] )
       	return (fd);
 		}	
 
-	set_interface_attribs (fd, B9600, 0);  // set speed to 9600 bps, 8n1 (no parity)
+	//set_interface_attribs (fd, B9600, 0);  // set speed to 9600 bps, 8n1 (no parity)
+	set_interface_attribs (fd, B115200, 0);  // set speed to 115200 bps, 8n1 (no parity)
 	set_blocking (fd, 0);                // set no blocking
 	
 	// this is necessary, not sure why.
