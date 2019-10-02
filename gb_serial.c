@@ -103,6 +103,80 @@ const char * STATUS_CODES[4][16] = {
 };
 
 /*############################################################################
+#  Title: lantronix_reset()
+#  Author: C.Johnson
+#  Date: 10/2/19
+#  Args: char *host -> address of lantronix
+	int port -> port that telnet server runs on(usually 9999 on lantronix)
+#  Returns: N/A
+#  Description: Resets the Lantronix UDS1100 RS485/Network adapter.  This
+#	is done in a hacky way by talking to the telnet server with
+#	sleeps to delay between communications.
+#
+#############################################################################*/
+
+void gb_lantronix_reset(char *host, short port)
+{
+int sockfd, connfd, x;
+char serialfix=128; 
+char buff[500];
+struct sockaddr_in servaddr, cli; 
+  
+	// socket create and varification 
+	sockfd = socket(AF_INET, SOCK_STREAM, 0); 
+	if (sockfd == -1) 
+		{ 
+		printf("socket creation failed...\n"); 
+		exit(0); 
+		} 
+	else
+	
+	printf("Socket successfully created..\n"); 
+	bzero(&servaddr, sizeof(servaddr)); 
+  
+	// assign IP, PORT 
+	servaddr.sin_family = AF_INET; 
+	servaddr.sin_addr.s_addr = inet_addr(host); 
+	servaddr.sin_port = htons(port); 
+  
+	// connect the client socket to server socket 
+	if (connect(sockfd, (struct sockaddr*)&servaddr, sizeof(servaddr)) != 0) 
+		{ 
+		printf("connection with the server failed...\n"); 
+		exit(0); 
+		} 
+	else
+		printf("connected to the server..\n"); 
+
+	
+
+	//first wait for the connection message
+	sleep(2);
+	memset(buff, 0, sizeof(buff));
+	x=recv(sockfd, buff, 500, MSG_DONTWAIT);
+	//printf("x=%i chars\n", x);
+	//printf("buff=%s\n", buff);
+
+	//send a carriage return to enter the menu
+	//then wait for the menu items
+	write(sockfd, "\r", 1);
+	sleep(2);
+	memset(buff, 0, sizeof(buff));
+	x=recv(sockfd, buff, sizeof(buff), MSG_DONTWAIT);
+	//printf("x=%i chars\n", x);
+	//printf("buff=%s\n", buff);
+
+	//select option 9 "save and exit", and 
+	//send another carriage return
+	write(sockfd, "9\r", 2);
+	close(sockfd);
+
+	sleep(5);
+
+
+}
+
+/*############################################################################
 #  Title: open_port_net()
 #  Author: C.Johnson
 #  Date: 9/9/19

@@ -36,11 +36,11 @@ void displayTelem(int ttyfd);
 int main(int argc, char ** argv)
 {
 	char strPort[100], strAxis[20];
-	int doinit=0, dohome=0, domove=0, dohelp=0;
-	int value=0, opt, iaxis, ttyfd, isFilter=0, test;
+	int doinit=0, dohome=0, domove=0, dohelp=0, reset_ltx=0;
+	int value=0, opt, iaxis, ttyfd, isFilter=0, test, isnet=0;
 	int axisinit=0, portinit=0, valinit=0, dotelem=0;
 	char resp[10000];
-	while ((opt = getopt(argc, argv, "p:ihmta:tv:?")) != -1) 
+	while ((opt = getopt(argc, argv, "p:ihLmta:tv:?")) != -1) 
 		{
                	switch (opt) 
 			{
@@ -48,6 +48,8 @@ int main(int argc, char ** argv)
                    		sprintf(strPort, "%s", optarg);
                    		portinit = 1;
                    		break;
+			case 'n': //set as network
+				isnet = 1;
                		case 'i': //Initialize
                    		doinit = 1;
 
@@ -55,7 +57,10 @@ int main(int argc, char ** argv)
                		case 'h': //home
                    		dohome = 1;
                   		break;
-               		case 'm': //home
+               		case 'L': //reset lantronix
+                   		reset_ltx = 1;
+                  		break;
+               		case 'm': //move
                    		domove = 1;
                   		break;
                		case 'a': //Set Axis
@@ -90,9 +95,17 @@ int main(int argc, char ** argv)
 		domessage(argv[0], "ERROR!!!  Must specify valid port");
 			
 		}
-	
+	if(reset_ltx)
+		{
+		fprintf(stderr, "\nOpening Port %s\n", strPort);
+		lantronix_reset(strPort);
+		}
 	//check and see if port opens
-	ttyfd = ttyOpen( strPort );
+	if(!isnet)
+		ttyfd = ttyOpen( strPort );
+	else
+		ttyfd = net_ttyOpen( strPort );
+
 	if(ttyfd == -1)
 		{
 		fprintf(stderr, "\nError Opening Port %s\n", strPort);

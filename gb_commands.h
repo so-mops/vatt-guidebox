@@ -12,4 +12,6 @@ int stageHome(int ttyfd, char *strAxis);
 int ttyOpen(char *ttyPort);
 int net_ttyOpen(char *netinfo);
 void ttyClose(int ttyfd);
+int lantronix_reset(char *netinfo);
+
 

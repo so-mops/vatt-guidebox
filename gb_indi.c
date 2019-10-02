@@ -99,6 +99,9 @@ static ISwitch comTypeS[] = {
 	 };
 static ISwitchVectorProperty comTypeSP = { mydev, "COMTYPE", "Connection Type",  ENG_GROUP, IP_RW, ISR_1OFMANY, 0, IPS_IDLE,  comTypeS, NARRAY(comTypeS), "", 0 };
 
+static ISwitch resetLtxS[] = {{"RESET_LTX",  "Reset Lantronix",  ISS_OFF, 0, 0},};
+static ISwitchVectorProperty resetLtxSP = { mydev, "lTXRESET", "Lantronix",  ENG_GROUP, IP_RW, ISR_1OFMANY, 0, IPS_IDLE,  resetLtxS, NARRAY(resetLtxS), "", 0 };
+
 
 static IText networkT[] =  {{"NETWORK", "Net", "10.130.133.24:10001", 0, 0, 0}};
 static ITextVectorProperty networkTP = {  mydev, "NET", "Guider Network Information",  ENG_GROUP , IP_RW, 0, IPS_IDLE,  networkT, NARRAY(networkT), "", 0};
@@ -225,6 +228,8 @@ char rawCmdString[50];
         IDDefSwitch (&engSwitchSP, NULL);
 
 		IDDefSwitch (&comTypeSP, NULL);
+
+		IDDefSwitch (&resetLtxSP, NULL);
 
 		IDDefText(&networkTP, NULL);
 		networkTP.tp[0].text = gnetwork;
@@ -559,8 +564,45 @@ void ISNewSwitch (const char *dev, const char *name, ISState *states, char *name
 	 
 		} /* end for */
 	}
+
+	else if (! strcmp(name, resetLtxSP.name))
+	{
+		for (i = 0; i < n; i++) 
+		{
+			
+			/* Find switches with the passed names in the initSP property */
+			sp = IUFindSwitch (&resetLtxSP, names[i]);
+			state = states[i];
+			isDifferent = state != sp->s;
+			if(!isDifferent)// no need to update. 
+				continue;
+			/*  init  */ 
+			if (sp == &resetLtxS[0]) 
+			{
+				if (state == ISS_ON)
+				{
+					IDMessage(mydev, "resetting lantronix");
+					lantronix_reset(networkT[0].text);
+					resetLtxS[0].s=ISS_ON;
+					
+					
+				}
+				else
+				{
+
+				}
+			}
+			
+			 
+			resetLtxSP.s = IPS_IDLE;
+					 
+			IUResetSwitch(&resetLtxSP);
+			//IDSetSwitch(&comTypeSP, NULL);
+	 
+		} /* end for */
+	}
 	
-	if (!strcmp(name, connectSP.name))
+	else if (!strcmp(name, connectSP.name))
 	{
 		sp = IUFindSwitch (&connectSP, names[0]);
 		IDMessage(mydev, "CONNECT HAS BEEN CALLED");

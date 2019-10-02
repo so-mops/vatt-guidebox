@@ -262,3 +262,32 @@ int active, x;
 	
 	
 }
+
+/*############################################################################
+#  Title: reset_net_adapter()
+#  Author: C.Johnson
+#  Date: 10/2/19
+#  Args:  char * host -> address of lantronix
+	int port -> port for telnet interface on lantronix
+#  Returns: ???
+#  Description: resets lantronix adapter.
+#
+#############################################################################*/
+int lantronix_reset(char *netinfo)
+{
+int port=10001, netfd;
+char input[50], *address, *portstr;
+		
+	//so we don't destroy the original string    
+	sprintf(input, "%s", netinfo);
+	
+	//get the address
+	address = strtok(input, ":"); 
+	if (address == NULL)
+		{
+		printf("no address\n");
+		return 0;
+		}
+	
+	gb_lantronix_reset(address, 9999);
+}
