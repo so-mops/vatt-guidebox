@@ -49,7 +49,8 @@
 
 #define POLLMS          1000                             /* poll period, ms */
 
-
+#define NET 0
+#define SER 1
 
 int RS485_FD;
 int inited;
@@ -65,6 +66,8 @@ static void fillMotors();
 char gttyPORT[20];
 char gnetwork[20];
 char gstatusString[7][1000];
+int gcomtype;
+
 // main connection switch
 static ISwitch connectS[] = {
 	   {"CONNECT",  "Connect",  ISS_OFF, 0, 0}
@@ -94,7 +97,7 @@ static ISwitch comTypeS[] = {
 	 {"NETWORK",  "Network",  ISS_ON, 0, 0},
          {"SERIAL",  "Serial",  ISS_OFF, 0, 0}
 	 };
-static ISwitchVectorProperty comTypeSP = { mydev, "COMTYPE", "Connection Type",  MAIN_GROUP, IP_RW, ISR_1OFMANY, 0, IPS_IDLE,  comTypeS, NARRAY(comTypeS), "", 0 };
+static ISwitchVectorProperty comTypeSP = { mydev, "COMTYPE", "Connection Type",  ENG_GROUP, IP_RW, ISR_1OFMANY, 0, IPS_IDLE,  comTypeS, NARRAY(comTypeS), "", 0 };
 
 
 static IText networkT[] =  {{"NETWORK", "Net", "10.130.133.24:10001", 0, 0, 0}};
@@ -237,6 +240,7 @@ char rawCmdString[50];
 		//TODO this should be read from a config file.
 		strcpy(ttyPortTP.tp[0].text, "/dev/ttyUSB0");
 		strcpy(networkTP.tp[0].text, "10.130.133.24:10001");
+		gcomtype = NET;
 		/*
 		IDDefText(&motorStatusTP, NULL);
 		motorStatusTP.tp[0].text = gstatusString[0];
@@ -500,14 +504,61 @@ void ISNewSwitch (const char *dev, const char *name, ISState *states, char *name
 	/* ignore if not ours */
 	if (strcmp (dev, mydev))
 		return;
-	
-       if (!strcmp (name, comTypeSP.name)) {
-             /* change comm type */
-             /* Check comTypeSP, if it is idle, then return */
-             
-	     
-             return;
-	    }
+	else if (! strcmp(name, comTypeSP.name))
+	{
+		for (i = 0; i < n; i++) 
+		{
+			
+			/* Find switches with the passed names in the initSP property */
+			sp = IUFindSwitch (&comTypeSP, names[i]);
+			state = states[i];
+			isDifferent = state != sp->s;
+			if(!isDifferent)// no need to update. 
+				continue;
+			/*  init  */ 
+			if (sp == &comTypeS[0]) 
+			{
+				if (state == ISS_ON)
+				{
+					IDMessage(mydev, "Changing COM to Network");
+					gcomtype = NET; 
+					comTypeS[0].s=ISS_ON;
+					comTypeS[0].s=ISS_OFF;
+					
+				}
+				else
+				{
+
+				}
+			}
+			
+			 
+			/*  home  */ 
+			else if (sp == &comTypeS[1]) 
+			{
+				if (state == ISS_ON)
+				{
+					IDMessage(mydev, "Changing COM to Serial");
+					gcomtype = SER;
+					comTypeS[0].s=ISS_OFF;
+					comTypeS[0].s=ISS_ON;
+					
+				}
+				else
+				{
+
+				}
+				  
+			}
+			 
+			/*  auto  */ 
+				comTypeSP.s = IPS_IDLE;
+					 
+			//IUResetSwitch(&comTypeSP);
+			//IDSetSwitch(&comTypeSP, NULL);
+	 
+		} /* end for */
+	}
 	
 	if (!strcmp(name, connectSP.name))
 	{
@@ -522,10 +573,11 @@ void ISNewSwitch (const char *dev, const char *name, ISState *states, char *name
 				//sp->s = states[0];
 				connectS[0].s = ISS_ON;
 				//connectS[1].s = ISS_OFF;
-				//RS485_FD = ttyOpen(ttyPortT[0].text);
-				//RS485_FD = net_ttyOpen("10.130.133.24:10001");
-				IDMessage(mydev, "networkT[0].text=%s", networkT[0].text);
-				RS485_FD = net_ttyOpen(networkT[0].text);
+				//IDMessage(mydev, "networkT[0].text=%s", networkT[0].text);
+				//if (gcomtype == NET)
+					RS485_FD = net_ttyOpen(networkT[0].text);
+				//else
+				//	RS485_FD = ttyOpen(ttyPortT[0].text);
 				if (RS485_FD > 0)
 				{
 					connectS[0].s = ISS_ON;
@@ -879,7 +931,7 @@ static int guiderTelem(int init_struct)
 	}
 
 
-	fprintf(stderr, "in guiderTelem %s\n", allmotors[5].name );
+	//fprintf(stderr, "in guiderTelem %s\n", allmotors[5].name );
  	return 1;
         
 
@@ -911,7 +963,7 @@ void guiderProc (void *p)
 	else
 		init_struct=0;
 
-	fprintf(stderr, "in guider proc\n");
+	//fprintf(stderr, "in guider proc\n");
 	/* If telescope is not on, do not query.  just start */
          if (connectSP.s == IPS_IDLE)
          {
@@ -932,7 +984,7 @@ void guiderProc (void *p)
  
          case IPS_OK:
             /********* TELEMETRY HOOK ********/
-		fprintf(stderr, "going to telem\n");
+		//fprintf(stderr, "going to telem\n");
 		
 	     guiderTelem(init_struct);
             /*********************************/
