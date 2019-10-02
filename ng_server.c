@@ -24,6 +24,7 @@
 #include <unistd.h> /* close */
 //#include "weather.h"
 #include "ng_server.h"
+#include "gb_commands.h"
 
 //general entry point for the server
 //void server_entry();
@@ -67,6 +68,8 @@ char cmd[ARG_LEN];
 ARG_ARRAY cmdArgs;
 }TCS_MESSAGE;
 
+int ttyfd;
+
 void init_data(TCS_MESSAGE *ret_message);
 void gen_string(TCS_MESSAGE *ret_message, char *out_string);
 void cpy_header(TCS_MESSAGE *new_message, TCS_MESSAGE *ret_message);
@@ -75,6 +78,18 @@ int call_daves_command_hook(ARG_ARRAY inArgs);
 int call_daves_request_hook(ARG_ARRAY inArgs, ARG_ARRAY outArgs);
 int packet_handler(int newSd);
 int msg_handler(char *in_string, char *out_string);
+
+/**********************************************
+*Title: server_entry_thread
+*Author: Chris Johnson
+*date 10/3/19
+*Description: this is a pthread style entry
+*	to the server_entry
+**********************************************/
+void *server_entry_thread(void *data)
+{
+server_entry();
+}
 
 /**********************************************
 *Title: server_entry
@@ -89,7 +104,7 @@ int msg_handler(char *in_string, char *out_string);
 *accept but I found this to be pointless as I can still 
 * hit 100hz in a single thread. 
 **********************************************/
-void *server_entry(void *data)
+void server_entry()
 {
 int sd, newSd, cliLen, iaddr, goodconnect;
 unsigned int yes = 1;
@@ -98,6 +113,7 @@ char in_string[MAX_MSG], out_string[MAX_MSG];
 pthread_t slave_server;
 int threadID, ret;
 struct timeval tv;
+ttyfd=0;
 
 	servAddr.sin_family = AF_INET;
 	servAddr.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -146,7 +162,7 @@ struct timeval tv;
       			}
 
 		ret = packet_handler(newSd);
-		if (ret=NOK)
+		if (ret==NOK)
 			{
 			printf("Message Not OK\n");
 			}	            
@@ -183,7 +199,7 @@ int rstat;
 
 	if (rstat == -1) 
 		{
-		perror("recv");
+		printf("recv\n");
 		return NOK;
 		}
 
@@ -204,7 +220,7 @@ int rstat;
 		tommy = send(newSd, out_string, strlen(out_string), 0);
 		if (tommy < 0)
 			{
-			printf("cannot send data ");
+			printf("cannot send data \n");
 			return NOK;
 			}
 	  	}
@@ -571,11 +587,55 @@ return NOK;
 **********************************************/
 int call_daves_command_hook(ARG_ARRAY inArgs)
 {
+int isAxis, filter;
 
-	if (strcmp(inArgs[0], "FART") == 0)
+	if (strcmp(inArgs[0], "CONNECT") == 0)
 		{
+		if (strcmp(inArgs[1], "NET") == 0)
+			ttyfd = net_ttyOpen( inArgs[2] );
+		else if (strcmp(inArgs[1], "SER") == 0)
+			ttyfd = ttyOpen( inArgs[2] );
+		else
+			{
+			ttyfd = 0;
+			return NOK;
+			}
 		return OK;
 		}
+	else if (strcmp(inArgs[0], "GUIDERINIT") == 0)
+		{
+		guider_init(ttyfd);
+		return OK;
+		}
+	else if (strcmp(inArgs[0], "AXHOME"))
+		{
+		if(ttyfd == 0)
+			return NOK;
+		if(! validateAxis(inArgs[1], &filter))
+			return NOK;
+		stageHome( ttyfd, inArgs[1] );
+		return OK;
+		}
+
+	else if (strcmp(inArgs[0], "AXMOVE"))
+		{
+		if(ttyfd == 0)
+			return NOK;
+		if(! validateAxis(inArgs[1], &filter))
+			return NOK;
+		int value = atoi(inArgs[2]);
+		stageGoTo( ttyfd, inArgs[1], value );
+		return OK;
+		}
+
+	else if (strcmp(inArgs[0], "CLOSE"))
+		{
+		ttyClose(ttyfd);
+		ttyfd = 0;
+		return OK;
+		}
+
+	
 return NOK;
 }
 

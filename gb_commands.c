@@ -77,8 +77,8 @@ char input[50], *address, *portstr;
 		if (port==0)
 			port=10001;
 		}
+	printf("opening add:%s  port%i\n", address, port);
 	netfd = open_port_net( address, port );
-	//netfd = open_port_net( "10.130.133.24", 10001 );
 	return netfd; 
     
  }

@@ -4,11 +4,11 @@
 
 GB_INDI_OBJS = gb_serial.o gb_indi.o gb_commands.o
 GB_STANDALONE_OBJS = gb_serial.o gb_standalone.o gb_commands.o
-GB_NG_OBJS = test.o ng_server.o
+GB_NG_OBJS = test.o ng_server.o gb_serial.o gb_commands.o
 
 ###############binaries####################
 
-all: gb_standalone gb_indi
+all: gb_standalone gb_indi gb_ng
 
 gb_indi: $(GB_INDI_OBJS)
 	gcc $^ -lindidriver -lm -o indi-vatt-guidebox
@@ -31,9 +31,6 @@ gb_indi.o: gb_indi.c
 gb_standalone.o: gb_standalone.c 
 	gcc -c gb_standalone.c
 
-lantronix.o: lantronics.c
-	gcc -c lantronics.c
-
 ng_server.o: ng_server.c
 	gcc -c ng_server.c
 
@@ -45,7 +42,7 @@ test.o:	test.c
 
 ###############utils#######################
 clean: \
-;rm *.o indi-vatt-guidebox vatt-guidebox
+;rm *.o indi-vatt-guidebox vatt-guidebox gb_ng
 
 
 
