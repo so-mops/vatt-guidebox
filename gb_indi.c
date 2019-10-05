@@ -61,7 +61,8 @@ static void zeroTelem();
 void guiderProc (void *p);
 static void buildMStatusString(MSTATUS *, char *);
 static void fillMotors();
-		
+static void fillFWheels();
+
 //global memory for IText properties
 char gttyPORT[20];
 char gnetwork[20];
@@ -168,8 +169,49 @@ static INumberVectorProperty offMirrNPR = {  mydev, "OFFSET_MIRRORS", "offset mi
 //Offset Filter Goto
 static INumber ofwNR[] = {{"OFFSET_FWHEEL","Offset Filter Position", "%f",0., 90., 0., 0., 0, 0, 0}, };
 
- static INumberVectorProperty ofwNPR = {  mydev, "OFFSET_FWHEEL", "offset filter goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  ofwNR, NARRAY(ofwNR), "", 0};
+static INumberVectorProperty ofwNPR = {  mydev, "OFFSET_FWHEEL", "offset filter goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  ofwNR, NARRAY(ofwNR), "", 0};
 
+
+// User given names for filters in lower filter wheel
+static IText lfnT[] = {
+	{"F0", "Filter 0", "", 0, 0, 0},
+	{"F1", "Filter 1", "", 0, 0, 0},
+	{"F2", "Filter 2", "", 0, 0, 0},
+	{"F3", "Filter 3", "", 0, 0, 0},
+	{"F4", "Filter 4", "", 0, 0, 0},
+};
+
+char lfnChars[5][30];
+
+static ITextVectorProperty lfnTP = { mydev, "LOWER_FNAMES", "Lower Filter Wheel Names", MAIN_GROUP , IP_RW, 0, IPS_IDLE,  lfnT, NARRAY(lfnT), "", 0};
+
+
+// User given names for filters in upper filter wheel
+static IText ufnT[] = {
+	{"F0", "Filter 0", "", 0, 0, 0},
+	{"F1", "Filter 1", "", 0, 0, 0},
+	{"F2", "Filter 2", "", 0, 0, 0},
+	{"F3", "Filter 3", "", 0, 0, 0},
+	{"F4", "Filter 4", "", 0, 0, 0},
+};
+
+char ufnChars[5][30];
+
+static ITextVectorProperty ufnTP = { mydev, "UPPER_FNAMES", "Upper Filter Wheel Names", MAIN_GROUP , IP_RW, 0, IPS_IDLE,  ufnT, NARRAY(ufnT), "", 0};
+
+
+// User given names for filters in upper filter wheel
+static IText gfnT[] = {
+	{"F0", "Filter 0", "U", 0, 0, 0},
+	{"F1", "Filter 1", "B", 0, 0, 0},
+	{"F2", "Filter 2", "V", 0, 0, 0},
+	{"F3", "Filter 3", "R", 0, 0, 0},
+	{"F4", "Filter 4", "I", 0, 0, 0},
+};
+
+char gfnChars[5][30];
+
+static ITextVectorProperty gfnTP = { mydev, "GUIDER_FNAMES", "Guider Filter Wheel Names", MAIN_GROUP , IP_RW, 0, IPS_IDLE,  gfnT, NARRAY(gfnT), "", 0};
 
 
 // Engineering stuff for each motor
@@ -177,7 +219,7 @@ static INumber ofwNR[] = {{"OFFSET_FWHEEL","Offset Filter Position", "%f",0., 90
 typedef struct _INDIMOTOR
 {
 	ILightVectorProperty word0LP;
-	ILight word0L[16];	
+	ILight word0L[16];
 
 	ILightVectorProperty word1LP;
 	ILight word1L[16];
@@ -192,10 +234,12 @@ typedef struct _INDIMOTOR
 	ISwitchVectorProperty engSwitchesSP;
 	ISwitch engSwithcesS[1];
 
-	int motor_num; //can address
-
+	int motor_num; //CAN address
 
 } INDIMOTOR;
+
+//The structures in this array are filled
+//in the fill motors function.
 
 INDIMOTOR indi_motors[7];
 
@@ -220,8 +264,8 @@ char rawCmdString[50];
 #############################################################################*/
  void ISGetProperties (const char *dev)
  {
-         if (dev && strcmp (mydev, dev))
-             return;
+		if (dev && strcmp (mydev, dev))
+			return;
  
 /********Telemetry***********/
         IDDefSwitch (&connectSP, NULL);
@@ -240,6 +284,7 @@ char rawCmdString[50];
 		IDDefText(&rawCmdTP, NULL);
 		rawCmdT[0].text = rawCmdString;
 
+		fillFWheels();		
 		fillMotors();
 
 		//TODO this should be read from a config file.
@@ -304,10 +349,15 @@ char rawCmdString[50];
 #############################################################################*/
  void ISNewText (const char *dev, const char *name, char *texts[], char *names[], int n)
  {
-	IDMessage(mydev, "ISNewText called [%s], %li", texts[0], sizeof(texts[0]));
+
+	IDMessage(mydev, "ISNewText called %s [%s], %li", name, texts[0], sizeof(texts[0]));
 	char septext[30];
 	char respbuff[100];
 
+	if( strcmp(mydev, dev) )
+	{
+		return;
+	}
 	if( !strcmp(name, "COM") )
 	{
 		
@@ -341,6 +391,40 @@ char rawCmdString[50];
 			IDSetText(&rawCmdTP, NULL);
 		}
 	}
+	/*
+	if( !strcmp(name, "LOWER_FNAMES") )
+	{
+		
+		//IUUpdateText(&lfnTP, texts, names, n);
+		for(int jj=0; jj<n; jj++)
+		{
+			strcpy( lfnT[jj].text, texts[jj] );
+		}
+		IDSetText(&lfnTP, NULL );
+	}	
+	
+	if( !strcmp(name, "UPPER_FNAMES") )
+	{
+		
+		//IUUpdateText(&ufnTP, texts, names, n);
+		for(int jj=0; jj<n; jj++)
+		{
+			strcpy( ufnT[jj].text, texts[jj] );
+		}
+		IDSetText(&ufnTP, NULL );
+	}
+
+	if( !strcmp(name, "GUIDER_FNAMES") )
+	{
+		
+		for(int jj=0; jj<n; jj++)
+		{
+			strcpy( gfnT[jj].text, texts[jj] );
+		}
+		IDSetText(&gfnTP, NULL );
+	}
+
+	*/
  	return;
  }
 
@@ -1130,7 +1214,7 @@ static void fillMotors()
 			else if(code_num == 12)
 			{//... and a line for Drive enable output which should always be high.
 				IUFillSwitch(imotor->iowordS+code_num, "ENBL", "Enabled", ISS_OFF);
-				IDMessage(mydev, "WE MADE IT TO ENABLE");
+				//IDMessage(mydev, "WE MADE IT TO ENABLE");
 			}
 		}
 		IDDefLight(&imotor->word0LP, NULL);
@@ -1153,4 +1237,33 @@ static void fillMotors()
 
 		motor_num++;
 	}
+}
+
+
+static void fillFWheels()
+{
+/*
+		//TODO should probably be in a config file
+		const char guider_filters[][20] = {
+			"U",
+			"B",
+			"V",
+			"R",
+			"I"
+		};
+
+		for(int ii=0; ii<5; ii++)
+		{	//point the text propterties at there 
+			//assoctiated char arrays
+
+			lfnT[ii].text = lfnChars[ii];
+			IDDefText(&lfnTP, NULL);
+
+			ufnT[ii].text = ufnChars[ii];
+			IDDefText(&ufnTP, NULL);
+			
+			strcpy( gfnChars[ii], guider_filters[ii] );
+			gfnT[ii].text = gfnChars[ii];
+			IDDefText(&gfnTP, NULL);
+		}*/
 }
