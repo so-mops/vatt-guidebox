@@ -77,21 +77,7 @@ static ISwitch connectS[] = {
 static ISwitchVectorProperty connectSP = { mydev, "CONNECTION", "Connection",  MAIN_GROUP, IP_RW, ISR_NOFMANY, 0, IPS_IDLE,  connectS, NARRAY(connectS), "", 0 };
  
 
-//***Guider Telemetry Data***
-struct stdT{
-	char offfoc[20],ufw[20],lfw[20],offx[20],offy[20],ofw[20],offmirr[20];};
-
-struct stdT stdTelem;
-
-static IText stdTelemT[] = {{"foc", "Focus Position "       , stdTelem.offfoc, 0, 0, 0},
-			{"xpos", "offset x "       , stdTelem.offx, 0, 0, 0},
-			{"ypos", "offset y "       , stdTelem.offy, 0, 0, 0},
-			{"ufw", "Upper Filter "       , stdTelem.ufw, 0, 0, 0},
-			{"lfw", "Lower Filter "       , stdTelem.lfw, 0, 0, 0},
-			{"ofw", "offset Filter "       , stdTelem.ofw, 0, 0, 0},
-			{"offmirr", "offset mirror "       , stdTelem.offmirr, 0, 0, 0}};
-			
-static ITextVectorProperty stdTelemTP = {  mydev, "stTELEM", "Guider Telemetry",  MAIN_GROUP , IP_RO, 0, IPS_IDLE,  stdTelemT, NARRAY(stdTelemT), "", 0};
+		
 
 // connection type switch
 static ISwitch comTypeS[] = {
@@ -111,17 +97,6 @@ static IText ttyPortT[] =  {{"TTYport", "TTY Port", "/dev/ttyUSB0", 0, 0, 0}};
 static ITextVectorProperty ttyPortTP = {  mydev, "COM", "Guider Communication",  ENG_GROUP , IP_RW, 0, IPS_IDLE,  ttyPortT, NARRAY(ttyPortT), "", 0};
 
 
-static IText motorStatusT[] = {
-	{"M1", "Motor 1", "", 0, 0, 0},
-	{"M2", "Motor 2", "", 0, 0, 0},
-	{"M3", "Motor 3", "", 0, 0, 0},
-	{"M4", "Motor 4", "", 0, 0, 0},
-	{"M5", "Motor 5", "", 0, 0, 0},
-	{"M6", "Motor 6", "", 0, 0, 0},
-	{"M7", "Motor 7", "", 0, 0, 0},
-};
-static ITextVectorProperty motorStatusTP = { mydev, "MSTATUS", "Motor Status", ENG_GROUP, IP_RO, 0, IPS_IDLE, motorStatusT, NARRAY(motorStatusT), "", 0};
-
 
 static ISwitch engSwitchsS[] = {{"SLIMITS", "FIND SOFT LIMITS", ISS_OFF, NULL, 0}};
 static ISwitchVectorProperty engSwitchSP = {mydev, "Switches", "Switches", ENG_GROUP, IP_RW, ISR_NOFMANY, 0, IPS_IDLE, engSwitchsS, NARRAY(engSwitchsS), "", 0};
@@ -139,7 +114,7 @@ ISwitchVectorProperty actionSP      = { mydev, "GUIDE_BOX_ACTIONS", "Guide Box A
 //Upper Filter Goto
 static INumber ufwNR[] = {{"FWHEEL_UPPER","Upper Filter", "%f",0., 0., 0., 0., 0, 0, 0}, };
 
- static INumberVectorProperty ufwNPR = {  mydev, "FWHEEL_UPPER", "Upper Filter Wheel goto",  MAIN_GROUP , IP_RW, 0, IPS_OK,  ufwNR, NARRAY(ufwNR), "", 0};
+ static INumberVectorProperty ufwNPR = {  mydev, "FWHEEL_UPPER", "Upper Filter Wheel goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  ufwNR, NARRAY(ufwNR), "", 0};
 
 //Lower Filter Goto
 static INumber lfwNR[] = {{"FWHEEL_LOWER","Lower Filter", "%f",0., 0., 0., 0., 0, 0, 0}, };
@@ -224,6 +199,10 @@ typedef struct _INDIMOTOR
 	ILightVectorProperty word1LP;
 	ILight word1L[16];
 
+	ILightVectorProperty userbitsLP;
+	ILight userbitsL[16];
+	
+
 	ISwitchVectorProperty iowordSP;
 	ISwitch iowordS[13];//GPIO, fault state and enable line
 
@@ -232,7 +211,9 @@ typedef struct _INDIMOTOR
 	char nameString[30];
 
 	ISwitchVectorProperty engSwitchesSP;
-	ISwitch engSwithcesS[1];
+	ISwitch engSwitchesS[1];
+
+	
 
 	int motor_num; //CAN address
 
@@ -292,15 +273,7 @@ char rawCmdString[50];
 		strcpy(networkTP.tp[0].text, "10.130.133.24:10001");
 		gcomtype = NET;
 		/*
-		IDDefText(&motorStatusTP, NULL);
-		motorStatusTP.tp[0].text = gstatusString[0];
-		motorStatusTP.tp[1].text = gstatusString[1];
-		motorStatusTP.tp[2].text = gstatusString[2];
-		motorStatusTP.tp[3].text = gstatusString[3];
-		motorStatusTP.tp[4].text = gstatusString[4];
-		motorStatusTP.tp[5].text = gstatusString[5];
-		motorStatusTP.tp[6].text = gstatusString[6];
-
+		
 		IDDefText(&motor1TP, NULL);
 		motor1T[0].text  = gstatusString[0];
 
@@ -748,7 +721,8 @@ char respbuffer[50];
 			{
 				moog_callsub(RS485_FD, 110, imotor->motor_num);
 				moog_read(RS485_FD, respbuffer);
-				IDMessage(mydev, "Moving %s out of limit resp is %s.", imotor->nameT[0].text, respbuffer  );
+				imotor->engSwitchesS[0].s = ISS_OFF;
+				IDSetSwitch(&imotor->engSwitchesSP, "Moving %s out of limit resp is %s.", imotor->nameT[0].text, respbuffer );
 			}
 		}
 
@@ -948,7 +922,8 @@ static int guiderTelem(int init_struct)
 		pNVP = motor2nvp(motor);
 		if(pNVP == NULL)
 		{//stuct did not init properly.
-			IDMessage(mydev, "Bad motor!");
+			IDMessage(mydev, "allmotors struct was not initalized correctly. This indicates a communication failure.");
+			//We should probably bail out and disconnect here.
 			continue;
 		}
 		if ( motor->isActive )
@@ -956,9 +931,9 @@ static int guiderTelem(int init_struct)
 		 motor over the can bus.*/
 			
 			if(motor->isHomed)
-				pNVP->s = IPS_OK;
+				pNVP->s = IPS_OK; //Motor is homed and ready to go 
 			else
-				pNVP->s = IPS_IDLE;
+				pNVP->s = IPS_BUSY; // Motor is not homed let user know. 
 			
 			pNVP->np[0].value = motor->pos;
 			statusLight = indi_motors[motor->motor_num-1].word0L;
@@ -1042,7 +1017,7 @@ void guiderProc (void *p)
 	/* If telescope is not on, do not query.  just start */
          if (connectSP.s == IPS_IDLE)
          {
-                 IEAddTimer (POLLMS, guiderProc, NULL);
+                 IEAddTimer (POLLMS/4, guiderProc, NULL);
                  return;
          }
  
@@ -1071,7 +1046,7 @@ void guiderProc (void *p)
          }
  
          /* again */
-         IEAddTimer (POLLMS, guiderProc, NULL);
+         IEAddTimer (POLLMS/4, guiderProc, NULL);
  }
  
 
@@ -1172,8 +1147,8 @@ static void fillMotors()
 		IUFillSwitchVector( &imotor->iowordSP, imotor->iowordS, NARRAY(imotor->iowordS), mydev, name, "IO", group, IP_RO, ISR_NOFMANY, 0, IPS_IDLE);
 
 		snprintf( name, 20, "M%iLIM", motor_num );
-		IUFillSwitchVector(&imotor->engSwitchesSP, imotor->engSwithcesS, NARRAY(imotor->engSwithcesS), mydev, name, "Special", group, IP_RW, ISR_NOFMANY, 0, IPS_IDLE);
-		IUFillSwitch(imotor->engSwithcesS, name, "Get Out of Limit", IPS_IDLE);
+		IUFillSwitchVector(&imotor->engSwitchesSP, imotor->engSwitchesS, NARRAY(imotor->engSwitchesS), mydev, name, "Special", group, IP_RW, ISR_NOFMANY, 0, IPS_IDLE);
+		IUFillSwitch(imotor->engSwitchesS, name, "Get Out of Limit", IPS_IDLE);
 		IDDefSwitch(&imotor->engSwitchesSP, NULL);
 
 		//Name of the motor
@@ -1191,9 +1166,9 @@ static void fillMotors()
 		IUFillLightVector(&imotor->word0LP, imotor->word0L, NARRAY(imotor->word0L), mydev, (const char *) name, (const char *) label, group, IPS_IDLE );
 		
 		
-
+		//Populate the status bits with the right oce
 		for(int code_num=0; code_num<16; code_num++)
-		{
+		{//word 1
 			snprintf(name, 20, "BIT%i", code_num);
 			strncpy(code, STATUS_CODES[0][code_num], lenlimit);
 			if( strlen(STATUS_CODES[0][code_num]) > lenlimit )
@@ -1225,7 +1200,8 @@ static void fillMotors()
 		IUFillLightVector(&imotor->word1LP, imotor->word1L, NARRAY(imotor->word1L), mydev, (const char *) name, (const char *) label, group, IPS_IDLE );
 
 		for(int code_num=0; code_num<16; code_num++)
-		{//TODO this could be done in the above for loop.
+		{//word 2
+			//TODO this could be done in the above for loop.
 			snprintf(name, 20, "BIT_02%i", code_num);
 			strncpy(code, STATUS_CODES[1][code_num], lenlimit);
 
@@ -1242,7 +1218,6 @@ static void fillMotors()
 
 static void fillFWheels()
 {
-/*
 		//TODO should probably be in a config file
 		const char guider_filters[][20] = {
 			"U",
@@ -1265,5 +1240,5 @@ static void fillFWheels()
 			strcpy( gfnChars[ii], guider_filters[ii] );
 			gfnT[ii].text = gfnChars[ii];
 			IDDefText(&gfnTP, NULL);
-		}*/
+		}
 }

@@ -390,7 +390,7 @@ int moog_read( int rs485_fd, char resp[] )
 	fd_set set;
 	struct timeval timeout;
 	timeout.tv_sec = 0;
-	timeout.tv_usec = 500000;
+	timeout.tv_usec = 200000;
 	FD_ZERO(&set);
 	FD_SET(rs485_fd, &set);
 	
