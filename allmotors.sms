@@ -59,8 +59,8 @@
 #define GET_HOMING_SENSOR IN(0) 
 #define GET_FILTER_SENSOR IN(1)
 
-#define ENGAGE_SOLENOID OS(9)
-#define RELEASE_SOLENOID OR(9)
+#define ENGAGE_SOLENOID OS(9):FWHEEL_UPPER
+#define RELEASE_SOLENOID OR(9):FWHEEL_UPPER
 #define HOME_SENSOR IN(0)
 #define FILTER_SENSOR IN(1)
 
@@ -87,6 +87,7 @@
 #define SLIMITS_ENABLED B(1,10)
 
 BAUD115200
+ECHO_OFF
 DEBUG = 1
 IF DEBUG PRINT("BEGINNING PROGRAM", #13) ENDIF
 GOSUB1
@@ -190,6 +191,20 @@ C103 ' Home assuming the home sensor is only active at the index (edge detection
 	' 8. Enable software limits
 	' 9. Turn off the home optical sensor
 
+	SWITCH CADDR ' Bail if I am the wrong motor
+	CASE OFFSET_FWHEEL
+		END
+	BREAK
+	CASE FWHEEL_UPPER
+		END
+	BREAK
+	CASE FWHEEL_LOWER
+		END
+	BREAK
+	ENDS
+		
+		
+	
 	IF READY == 1 ' We don't home if the motor isn't ready.
 		
 		IF DEBUG == 1 PRINT("HOMING MOTOR", #13) ENDIF
@@ -206,7 +221,7 @@ C103 ' Home assuming the home sensor is only active at the index (edge detection
 		TURN_ON_HOMING_IRLED
 		WAIT=100
 		MV
-		VT=HOME_DIRECTION*MAXV/2
+		VT=HOME_DIRECTION*MAXV/4
 		G
 		
 		IF DEBUG == 1 PRINT("HEADING TO HOME", #13) ENDIF
@@ -247,13 +262,28 @@ C102 ' Home assuming the home sensor is only active at the index (edge detection
 
 	'Algorithm:
 	' 1. Turn on home optical sensor
-	' 2. Using velocity mode, move towared in the positive direction.
-	' 3. When limit is reached, move toward home sensor.
-	' 4. When home is reached, store home position and ramp down to stop.
-	' 5. Using positin mode, move to stored home position.
-	' 6. Set the homed bit
-	' 7. Enable software limits
-	' 8. Turn off home optical sensor
+	' 2. Using velocity mode, move towared in the home sensor.
+	' 3. When home is reached, store home position and ramp down to stop.
+	' 4. Using positin mode, move to stored home position.
+	' 5. Set the homed bit
+	' 6. Enable software limits
+	' 7. Turn off home optical sensor
+
+	SWITCH CADDR ' This should never be used for the linear stages
+	CASE OFFSET_X
+		END
+	BREAK
+	CASE OFFSET_Y
+		END
+	BREAK
+	CASE OFFSET_FOCUS
+		END
+	BREAK
+	CASE OFFSET_MIRRORS
+		END
+	BREAK
+	ENDS
+
 	IF DEBUG == 1 PRINT("FILTER HOME CALLED", #13) ENDIF 
 	IF READY == 1 ' We don't home if the motor isn't ready.
 		
@@ -279,7 +309,7 @@ C102 ' Home assuming the home sensor is only active at the index (edge detection
 		' and record position of home sensor
 			IF HOME_SENSOR == HOME_ACTIVE_STATE
 				IF DEBUG == 1 PRINT("HOME SENSOR TRIPPED", #13) ENDIF
-				IF FILTER_SENSOR == 0
+				IF FILTER_SENSOR == HOME_ACTIVE_STATE
 					IF DEBUG == 1 PRINT("FILTER SENSOR TRIPPED", #13) ENDIF
 					b=PA
 					BREAK
@@ -316,14 +346,14 @@ RETURN
 C101 'HOME at the limits'
 	SLD
 	MV
-	VT=MAXV/2
+	VT=MAXV/4
 	G
 	TWAIT
 	POS_MSWITCH_POS=PA
 	
 	GOSUB(110)
 	MV
-	VT=-MAXV/2
+	VT=-MAXV/4
 	G
 	TWAIT
 	NEG_MSWITCH_POS=PA
@@ -333,6 +363,7 @@ C101 'HOME at the limits'
 	TWAIT
 	O=0
 	PT=PA
+	VT=MAXV
 	SET_HOMED_BIT
 	OFF	
 	
@@ -344,7 +375,7 @@ RETURN
 C100 ' Home all the motors in series
 	IF OFFSET_X_OK
 		IF DEBUG == 1 PRINT("HOMING OFFSET_X", #13) ENDIF
-		GOSUB(102):OFFSET_X
+		GOSUB(103):OFFSET_X
 		WHILE GET_HOMED_BIT:OFFSET_X == 0 
 			WAIT=100
 		LOOP
@@ -354,7 +385,7 @@ C100 ' Home all the motors in series
 	
 	IF OFFSET_Y_OK
 		IF DEBUG == 1 PRINT("HOMING OFFSET_Y", #13) ENDIF
-		GOSUB(102):OFFSET_Y
+		GOSUB(103):OFFSET_Y
 		WHILE GET_HOMED_BIT:OFFSET_Y 
 			WAIT=100 
 		LOOP
@@ -372,7 +403,7 @@ C100 ' Home all the motors in series
 
 	IF OFFSET_MIRRORS_OK
 		IF DEBUG == 1 PRINT("HOMING OFFSET_MIRRORS", #13) ENDIF
-		GOSUB(101):OFFSET_MIRRORS
+		GOSUB(103):OFFSET_MIRRORS
 		WHILE GET_HOMED_BIT:OFFSET_FWHEEL 
 			WAIT=100 
 		LOOP
@@ -399,6 +430,14 @@ C100 ' Home all the motors in series
 		
 	ENDIF
 
+	IF OFFSET_FWHEEL_OK
+		IF DEBUG == 1 PRINT("HOMING FWHEEL_UPPER", #13) ENDIF
+		GOSUB(102):OFFSET_FWHEEL
+		WHILE GET_HOMED_BIT:OFFSET_FWHEEL 
+			WAIT=100 
+		LOOP
+		
+	ENDIF
 RETURN
 
 C110 'Get out of limit
@@ -564,6 +603,9 @@ C0  ' Startup stuff the head node motor
 	ACCEL:OFFSET_FOCUS = 500
 	DECEL:OFFSET_FOCUS = 500
 	HOME_DIRECTION:OFFSET_FOCUS = 1
+	HOME_INACTIVE_STATE:OFFSET_FOCUS = 0
+	HOME_ACTIVE_STATE:OFFSET_FOCUS = 1
+	HOME_DIRECTION:OFFSET_FOCUS = -1
 	WAIT=100
 	IF Bs == 1
 		IF DEBUG == 1 PRINT("Motor 3 (Focus stage) not accessible on CAN", #13 ) ENDIF
@@ -579,8 +621,8 @@ C0  ' Startup stuff the head node motor
 	UMIRROR_POS:OFFSET_MIRRORS = 30000
 	CENTER_POS:OFFSET_MIRRORS = 0
 	HOME_INACTIVE_STATE:OFFSET_MIRRORS = 0
-	HOME_ACTIVE_STATE:OFFSET_MIRRORS = 1
-	HOME_DIRECTION:OFFSET_MIRRORS = 1
+	HOME_ACTIVE_STATE:OFFSET_MIRRORS = 0
+	HOME_DIRECTION:OFFSET_MIRRORS = -1
 	WAIT=100
 	IF Bs == 1
 		IF DEBUG == 1 PRINT("U-Mirror Stage not accessible on CAN", #13 ) ENDIF
@@ -611,7 +653,7 @@ C0  ' Startup stuff the head node motor
 	ACCEL:FWHEEL_UPPER = 2
 	DECEL:FWHEEL_UPPER = 2
 	FILTER_DIST:FWHEEL_UPPER =1600
-	HOME_OFFSET:FWHEEL_UPPER = -500
+	HOME_OFFSET:FWHEEL_UPPER = 0
 	HOME_INACTIVE_STATE:FWHEEL_UPPER = 0
 	HOME_ACTIVE_STATE:FWHEEL_UPPER = 1
 	HOME_DIRECTION:FWHEEL_UPPER = -1
@@ -632,7 +674,7 @@ C0  ' Startup stuff the head node motor
 	ACCEL:FWHEEL_LOWER = 2
 	DECEL:FWHEEL_LOWER = 2
 	FILTER_DIST:FWHEEL_LOWER = 1600
-	HOME_OFFSET:FWHEEL_LOWER = -500
+	HOME_OFFSET:FWHEEL_LOWER = 0
 	HOME_INACTIVE_STATE:FWHEEL_UPPER = 0
 	HOME_ACTIVE_STATE:FWHEEL_UPPER = 1
 	HOME_DIRECTION:FWHEEL_UPPER = 1
@@ -653,8 +695,10 @@ C400 ' go to filter
 	IF f >= 0
 		IF f < 5
 			PT = f * FILTER_DIST
-			TURN_ON_HOMING_IRLED
-			RELEASE_SOLENOID
+			'TURN_ON_HOMING_IRLED
+			IF CADDR != OFFSET_FWHEEL
+				RELEASE_SOLENOID
+			ENDIF
 			' TODO: we need to verify the solenoid released.
 			G TWAIT
 			
@@ -662,8 +706,10 @@ C400 ' go to filter
 			IF FILTER_SENSOR == 0
 				IF DEBUG PRINT("WE are on the filter!", #13) ENDIF
 			ENDIF
-			TURN_OFF_HOMING_IRLED
-			ENGAGE_SOLENOID
+			'TURN_OFF_HOMING_IRLED
+			IF CADDR != OFFSET_FWHEEL
+				ENGAGE_SOLENOID
+			ENDIF
 			
 			OFF
 		ENDIF
