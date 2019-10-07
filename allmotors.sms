@@ -51,7 +51,7 @@
 #define NEG_SLIMIT dd
 #define POS_SLIMIT ee
 
-#define SET_HOMED_BIT US(0)
+#define SET_HOMED_BIT US(0) US(16+CADDR):HEAD_NODE
 #define GET_HOMED_BIT B(12,0)
 
 #define TURN_ON_HOMING_IRLED OS(4) OS(5)
@@ -85,6 +85,9 @@
 #define HOME_DIRECTION oo
 
 #define SLIMITS_ENABLED B(1,10)
+
+#define MOTORII pp
+#define DUMMYVAR qq
 
 BAUD115200
 ECHO_OFF
@@ -150,34 +153,40 @@ ENDS
 
 END
 
-C63 'OFFSET_X subroutine
-	WHILE 1
-		IF a!=PT
-			PT=a
-			G
-			PRINT(a,#13)
-			TWAIT
-		ENDIF
-	LOOP
+'Maps the home subroutine to the can address
+' This way the command is the same from the 
+' user point of view. 
+' For example if the user wants to home OFFSET_X 
+' and FWHEEL_UPPER they simply use:
+' GOSUB(104):1 GOSUB(104):7
+C104
+	SWITCH CADDR
+		CASE OFFSET_X
+			GOSUB(103)
+		BREAK
+		CASE OFFSET_Y
+			GOSUB(103)
+		BREAK
+		CASE OFFSET_FOCUS
+			GOSUB(101)
+		BREAK
+		CASE OFFSET_MIRRORS
+			GOSUB(103)
+		BREAK
+		CASE OFFSET_FWHEEL
+			GOSUB(102)
+		BREAK
+		CASE FWHEEL_LOWER
+			GOSUB(102)
+		BREAK
+		CASE FWHEEL_UPPER
+			GOSUB(102)
+		BREAK
+	ENDS
 RETURN
-
-
-C2 'OFFSET_Y subroutine
-	PRINT("Beginning OFFSET_Y Routine", #13)
-	
-	WHILE 1
-		IF a!=PT
-			PT=a
-			G
-			PRINT(a, #13)
-			TWAIT
-		ENDIF
-	LOOP
-RETURN
-
 
 C103 ' Home assuming the home sensor is only active at the index (edge detection)
-	' This subroutine is only used for a test linear stage.
+	' This subroutine is only used for the linear stages.
 
 	'Algorithm:
 	' 
@@ -386,7 +395,7 @@ C100 ' Home all the motors in series
 	IF OFFSET_Y_OK
 		IF DEBUG == 1 PRINT("HOMING OFFSET_Y", #13) ENDIF
 		GOSUB(103):OFFSET_Y
-		WHILE GET_HOMED_BIT:OFFSET_Y 
+		WHILE GET_HOMED_BIT:OFFSET_Y == 0
 			WAIT=100 
 		LOOP
 		OFF:OFFSET_Y
@@ -404,19 +413,20 @@ C100 ' Home all the motors in series
 	IF OFFSET_MIRRORS_OK
 		IF DEBUG == 1 PRINT("HOMING OFFSET_MIRRORS", #13) ENDIF
 		GOSUB(103):OFFSET_MIRRORS
-		WHILE GET_HOMED_BIT:OFFSET_FWHEEL 
+		WHILE GET_HOMED_BIT:OFFSET_MIRRORS == 0
 			WAIT=100 
 		LOOP
 		OFF:OFFSET_MIRRORS
 	ENDIF
 
-	IF DEBUG == 1 PRINT("Here GOD DAMNIT", #13) ENDIF
+	
 	IF FWHEEL_LOWER_OK
 		IF DEBUG == 1 PRINT("HOMING FWHEEL_LOWER", #13) ENDIF
 		GOSUB(102):FWHEEL_LOWER
-		WHILE GET_HOMED_BIT:FWHEEL_LOWER 
+		WHILE GET_HOMED_BIT:FWHEEL_LOWER == 0
 			WAIT=100 
 		LOOP
+		OFF:FWHEEL_LOWER
 		
 	ENDIF
 
@@ -424,16 +434,16 @@ C100 ' Home all the motors in series
 	IF FWHEEL_UPPER_OK
 		IF DEBUG == 1 PRINT("HOMING FWHEEL_UPPER", #13) ENDIF
 		GOSUB(102):FWHEEL_UPPER
-		WHILE GET_HOMED_BIT:FWHEEL_UPPER 
+		WHILE GET_HOMED_BIT:FWHEEL_UPPER == 0
 			WAIT=100 
 		LOOP
 		
 	ENDIF
 
 	IF OFFSET_FWHEEL_OK
-		IF DEBUG == 1 PRINT("HOMING FWHEEL_UPPER", #13) ENDIF
+		IF DEBUG == 1 PRINT("HOMING OFFSET_FWHEEL", #13) ENDIF
 		GOSUB(102):OFFSET_FWHEEL
-		WHILE GET_HOMED_BIT:OFFSET_FWHEEL 
+		WHILE GET_HOMED_BIT:OFFSET_FWHEEL == 0
 			WAIT=100 
 		LOOP
 		
@@ -514,6 +524,7 @@ RETURN
 
 
 C200 ' Home sub assuming the home switch is active half of the travel.
+		' This is only used for a test linear stage. 
 	PRINT("Homing Motor", #13)
 	MV
 	IF IN(10) == 0 ' positive side of home
@@ -773,12 +784,29 @@ RETURN
 
 C50 ' Attempt to find spare
 RETURN
-C998 'Send square wave to LED on optical switch'
-	WHILE 1
-		OR(4)
-		WAIT=1000
-		OS(4)
-		WAIT=1000
+
+C998 'Send out telemetry data
+	MOTORII = 1
+	WHILE MOTORII < 8
+		PRINT( MOTORII, " " )
+		DUMMYVAR = PA:MOTORII
+		PRINT( DUMMYVAR, " " )
+		DUMMYVAR = f:MOTORII
+		PRINT( DUMMYVAR, " " )
+		DUMMYVAR = W(0):MOTORII
+		PRINT( DUMMYVAR, " " )
+		DUMMYVAR = W(1):MOTORII
+		PRINT( DUMMYVAR, " " )
+		DUMMYVAR = W(3):MOTORII
+		PRINT( DUMMYVAR, " " )
+		DUMMYVAR = W(4):MOTORII
+		PRINT( DUMMYVAR, " " )
+		DUMMYVAR = W(12):MOTORII 'User bits
+		PRINT( DUMMYVAR, " " )
+		DUMMYVAR = W(16):MOTORII ' IO
+		PRINT( DUMMYVAR, " " )
+		PRINT(#13)
+		MOTORII = MOTORII + 1
 	LOOP
 RETURN
 
