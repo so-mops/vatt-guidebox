@@ -258,9 +258,7 @@ int active, x;
 	}
 
 	
-	return moog_getallstatus(ttyfd, allmotors);
-	
-	
+	return moog_getallstatus_quick(ttyfd, allmotors);
 }
 
 /*############################################################################

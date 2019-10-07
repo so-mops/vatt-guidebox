@@ -47,7 +47,7 @@
 #define MOT6_GROUP "MOTOR 6 Eng"
 #define MOT7_GROUP "MOTOR 7 Eng"
 
-#define POLLMS          1000                             /* poll period, ms */
+#define POLLMS          250                             /* poll period, ms */
 
 #define NET 0
 #define SER 1
@@ -147,6 +147,11 @@ static INumber ofwNR[] = {{"OFFSET_FWHEEL","Offset Filter Position", "%f",0., 90
 static INumberVectorProperty ofwNPR = {  mydev, "OFFSET_FWHEEL", "offset filter goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  ofwNR, NARRAY(ofwNR), "", 0};
 
 
+// Head Node Name
+static IText head_nodeT[] = {{"HEAD", "Head Motor Node", "IDK?", 0, 0, 0}};
+static char head_nodeString[20];
+static ITextVectorProperty head_nodeTP = { mydev, "HEAD", "Head Motor Node", ENG_GROUP , IP_RO, 0, IPS_IDLE,  head_nodeT, NARRAY(head_nodeT), "", 0};
+
 // User given names for filters in lower filter wheel
 static IText lfnT[] = {
 	{"F0", "Filter 0", "", 0, 0, 0},
@@ -211,8 +216,7 @@ typedef struct _INDIMOTOR
 	char nameString[30];
 
 	ISwitchVectorProperty engSwitchesSP;
-	ISwitch engSwitchesS[1];
-
+	ISwitch engSwitchesS[2];
 	
 
 	int motor_num; //CAN address
@@ -264,6 +268,9 @@ char rawCmdString[50];
 
 		IDDefText(&rawCmdTP, NULL);
 		rawCmdT[0].text = rawCmdString;
+
+		IDDefText(&head_nodeTP, NULL);
+		head_nodeT[0].text = head_nodeString;
 
 		fillFWheels();		
 		fillMotors();
@@ -364,7 +371,6 @@ char rawCmdString[50];
 			IDSetText(&rawCmdTP, NULL);
 		}
 	}
-	/*
 	if( !strcmp(name, "LOWER_FNAMES") )
 	{
 		
@@ -397,7 +403,6 @@ char rawCmdString[50];
 		IDSetText(&gfnTP, NULL );
 	}
 
-	*/
  	return;
  }
 
@@ -719,16 +724,26 @@ char respbuffer[50];
 		{
 			if( !strcmp(name, imotor->engSwitchesSP.name) )
 			{
+				for(int ii=0; ii<n; ii++)
+				{
+					if( !strcmp( names[ii], imotor->engSwitchesS[0].name ) )
+					{//Get out of limit
+						moog_callsub(RS485_FD, 110, imotor->motor_num);
+					}
+					else if( !strcmp( names[ii], imotor->engSwitchesS[1].name ) )
+					{
+					}
+				}
 				moog_callsub(RS485_FD, 110, imotor->motor_num);
 				moog_read(RS485_FD, respbuffer);
 				imotor->engSwitchesS[0].s = ISS_OFF;
+				imotor->engSwitchesS[1].s = ISS_OFF;
 				IDSetSwitch(&imotor->engSwitchesSP, "Moving %s out of limit resp is %s.", imotor->nameT[0].text, respbuffer );
 			}
 		}
 
 	}
 
-	
 	
 }
 
@@ -881,8 +896,7 @@ static int guiderTelem(int init_struct)
 	char readBuffer[40];
 	moog_write( RS485_FD, "RW(13)" );
 	moog_read(RS485_FD, readBuffer );
-	
-
+	int head_node;
 	if(init_struct)
 	{
 		memset(allmotors,0,(sizeof(MSTATUS)*7));
@@ -894,8 +908,12 @@ static int guiderTelem(int init_struct)
 	//this is caught later when we do the if pNVP == NULL 
 	//a few lines below
 	
-	fprintf(stderr, "init_struct is %i\n", init_struct);
 	active = doTelemetry(RS485_FD, allmotors, init_struct);
+
+	if(init_struct)
+	{
+		head_node = allmotors[0].head_node;
+	}
 
 	//Iterate through the allmotors array so we can populate 
 	//indi fields.
@@ -910,6 +928,13 @@ static int guiderTelem(int init_struct)
 				strncpy(indi_motors[motor->motor_num-1].nameT[0].text,  motor->name, 30);
 			indi_motors[motor->motor_num-1].motor_num  = motor->motor_num;
 			IDSetText(&indi_motors[motor->motor_num-1].nameTP, NULL);
+			if( motor->head_node == motor->motor_num )
+			{
+				strcpy(head_nodeT[0].text, motor->name);
+				IDSetText(&head_nodeTP, NULL);
+			}
+			
+			
 		}
 
 		//motor2nvp uses the motor->name to 
@@ -933,13 +958,14 @@ static int guiderTelem(int init_struct)
 			if(motor->isHomed)
 				pNVP->s = IPS_OK; //Motor is homed and ready to go 
 			else
-				pNVP->s = IPS_BUSY; // Motor is not homed let user know. 
+				pNVP->s = IPS_BUSY; // Motor is not homed. Let user know. 
 			
 			pNVP->np[0].value = motor->pos;
 			statusLight = indi_motors[motor->motor_num-1].word0L;
 			statusLightVP = &indi_motors[motor->motor_num-1].word0LP;
 			ioBitSwitch = indi_motors[motor->motor_num-1].iowordS;
 			ioBitSwitchVector = &indi_motors[motor->motor_num-1].iowordSP;
+
 			if(statusLight != NULL)
 			{
 				for(int sbit=0; sbit<16; sbit++)
@@ -954,7 +980,6 @@ static int guiderTelem(int init_struct)
 					{
 						statusLight[sbit].s = IPS_IDLE;
 					}
-					IDSetLight(statusLightVP, NULL);
 
 					if(motor->iobits & (1<<sbit))
 					{
@@ -964,9 +989,10 @@ static int guiderTelem(int init_struct)
 					{
 						ioBitSwitch[sbit].s = ISS_OFF;
 					}
-					IDSetSwitch(ioBitSwitchVector, NULL );
 
 				}
+				IDSetLight(statusLightVP, NULL);
+				IDSetSwitch(ioBitSwitchVector, NULL );
 			}
 
 
@@ -1017,7 +1043,7 @@ void guiderProc (void *p)
 	/* If telescope is not on, do not query.  just start */
          if (connectSP.s == IPS_IDLE)
          {
-                 IEAddTimer (POLLMS/4, guiderProc, NULL);
+                 IEAddTimer (POLLMS, guiderProc, NULL);
                  return;
          }
  
@@ -1046,7 +1072,7 @@ void guiderProc (void *p)
          }
  
          /* again */
-         IEAddTimer (POLLMS/4, guiderProc, NULL);
+         IEAddTimer (POLLMS, guiderProc, NULL);
  }
  
 
@@ -1149,6 +1175,9 @@ static void fillMotors()
 		snprintf( name, 20, "M%iLIM", motor_num );
 		IUFillSwitchVector(&imotor->engSwitchesSP, imotor->engSwitchesS, NARRAY(imotor->engSwitchesS), mydev, name, "Special", group, IP_RW, ISR_NOFMANY, 0, IPS_IDLE);
 		IUFillSwitch(imotor->engSwitchesS, name, "Get Out of Limit", IPS_IDLE);
+
+		snprintf( name, 20, "M%iHOME", motor_num );
+		IUFillSwitch(imotor->engSwitchesS+1, name, "Home", IPS_IDLE);
 		IDDefSwitch(&imotor->engSwitchesSP, NULL);
 
 		//Name of the motor
@@ -1166,7 +1195,7 @@ static void fillMotors()
 		IUFillLightVector(&imotor->word0LP, imotor->word0L, NARRAY(imotor->word0L), mydev, (const char *) name, (const char *) label, group, IPS_IDLE );
 		
 		
-		//Populate the status bits with the right oce
+		//Populate the status bits with the correct code
 		for(int code_num=0; code_num<16; code_num++)
 		{//word 1
 			snprintf(name, 20, "BIT%i", code_num);

@@ -452,6 +452,7 @@ int moog_init(int rs485_fd )
 
 	moog_write(rs485_fd, "Z:0"); //reset all nodes
 	sleep(1);
+
 	moog_write(rs485_fd, "ddd=0" ); // Turn debug off
 	moog_write(rs485_fd, "GOSUB(0)" ); // start head node
 	usleep(200000);
@@ -627,7 +628,7 @@ int moog_getstatus(int rs485_fd, MSTATUS* stat)
 	if( moog_read(rs485_fd, resp) == 0)
     {
 		stat->userbits = atoi(resp);
-        stat->isHomed = stat->iobits & 1;
+        stat->isHomed = stat->userbits & 1;
     }
 	else
 	{
@@ -654,7 +655,19 @@ int moog_getstatus(int rs485_fd, MSTATUS* stat)
 	return 0;
 }
 
-
+/***************************************
+ *Name: moog_getallstatus
+ *Args: rs485_fd stat-> array of MSTATUS structs
+ *Description: get the status of all the drives
+ *		By querying individual motors one at a 
+ *		time. This is a laborious process and 
+ *		should be replaced. 
+ *
+ *
+ *
+ *
+ *
+ * ***************************************/
 int moog_getallstatus(int rs485_fd, MSTATUS stat[])
 {
 	int active;
@@ -686,6 +699,57 @@ int moog_getallstatus(int rs485_fd, MSTATUS stat[])
 			motor->isActive = 0;
 	
 	}
+	return active;
+}
+
+/*****************************************************8
+ *Name: moog_getallstatus_quick
+ *Args: rs485_fd, motors->allmotors array
+ *
+ *Description: This function replaces the moog_getallstatus
+ *	with a quicker version. Here we call the 998 subroutine
+ *	on the head node and it spits back the necessary info
+ *	about each motor all at once rather that querying 
+ *	each piece of data one at a time. 
+ *
+ *
+ *
+ *
+ *
+ *
+ * *****************************************************/
+int moog_getallstatus_quick(int rs485_fd, MSTATUS motors[])
+{
+	char resp[READSIZE];
+	int read_status=0;
+	int motor_num=0, pos, f, w0, w1, w2, w3, userbits, iobits;
+	int wc, active;
+	moog_callsub( rs485_fd, 998, -1);
+	while(motor_num <7 )
+	{
+		moog_read(rs485_fd, resp) == -1;
+		wc = sscanf(resp, "%i %i %i %i %i %i %i %i %i", &motor_num, &pos, &f, &w0, &w1, &w2, &w3, &userbits, &iobits );
+		if (wc != 9)
+			continue;
+		for(MSTATUS *motor=motors; motor!=motors+NMOTORS; motor++)
+		{
+			if(motor_num == motor->motor_num)
+			{
+				motor->pos = pos;
+				motor->fnum = f;
+				motor->words[0] = w0;
+				motor->words[1] = w1;
+				motor->words[2] = w2;
+				motor->words[3] = w3;
+				motor->userbits = userbits;
+				motor->iobits = iobits;
+				motor->isActive = 1;
+				motor->isHomed = userbits & 1;
+				active = (1<<motor->motor_num) | active;
+			}
+		}
+	}
+	
 	return active;
 }
 
@@ -726,13 +790,18 @@ void print_status(MSTATUS stat)
  * 		motors - > arrary of status structs to be built
  *
  * Description:
- * 		Uses the gosub(999) subroutine call
+ * 		Uses the GOSUB(999) subroutine call
  * 		to get a list of all the motor names 
  * 		and their numbers from from the serial 
  * 		line. This information is then stored 
  * 		in the array of status structs. This
  * 		is how the GUI maps the can address 
  *		(motor_num) to the name of the motor.
+ *
+ *		TODO: The number of motors should 
+ *		probably be a variable and not a 
+ *		hard coded thing. Perhaps a macro 
+ *		is called for. 
  *
  *
  *
@@ -742,8 +811,39 @@ int build_stat_structs( int rs485_fd, MSTATUS motors[] )
 	char resp[READSIZE];
 	moog_read(rs485_fd, resp); //flush line
 	int wc;
+	int head_node;
+
+	//Grab the head node address.
+	moog_write(rs485_fd, "RCADDR");
+	moog_read(rs485_fd, resp);
+	head_node = atoi(resp);
+
 	moog_callsub(rs485_fd, 999, -1 );
-	
+	for(int ii=0; ii<7; ii++ )
+	{
+		moog_read( rs485_fd, resp );
+		wc = sscanf(resp, "MOTOR #%i %s", &motors[ii].motor_num, motors[ii].name );
+		motors[ii].head_node = head_node;
+		if( strcmp(motors[ii].name, "OFFSET_FWHEEL") == 0 )
+		{
+			motors[ii].isFilter = 1;
+		}
+		else if( strcmp(motors[ii].name, "OFFSET_FWHEEL") == 0 )
+		{
+			motors[ii].isFilter = 1;
+		}
+		else if( strcmp(motors[ii].name, "OFFSET_FWHEEL") == 0 )
+		{
+			motors[ii].isFilter = 1;
+		}
+		else
+		{
+			motors[ii].isFilter = 0;
+		}
+
+	}
+
+	/*
 	moog_read( rs485_fd, resp );
 	wc = sscanf(resp, "MOTOR #%i %s", &motors[0].motor_num, motors[0].name );
 
@@ -764,6 +864,8 @@ int build_stat_structs( int rs485_fd, MSTATUS motors[] )
 
 	moog_read( rs485_fd, resp );
 	wc = sscanf(resp, "MOTOR #%i %s", &motors[6].motor_num, motors[6].name );
+	*/
+	
 
 }
 
