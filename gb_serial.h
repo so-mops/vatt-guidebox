@@ -9,7 +9,7 @@
 
 
 #define SENDSIZE 100
-#define READSIZE 10000
+#define READSIZE 1000
 
 typedef struct 
 {
@@ -23,6 +23,9 @@ typedef struct
 	int isActive;
 	int isFilter;
 	int isHomed;
+	int inNegLimit;
+	int inPosLimit;
+	int isMoving;
 	int head_node;
 
 
