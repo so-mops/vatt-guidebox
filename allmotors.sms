@@ -278,7 +278,7 @@ C102 ' Home assuming the home sensor is only active at the index (edge detection
 	' 6. Enable software limits
 	' 7. Turn off home optical sensor
 
-	SWITCH CADDR ' This should never be used for the linear stages
+	SWITCH CADDR ' Bail if this isn't a filter wheel
 	CASE OFFSET_X
 		END
 	BREAK
@@ -351,6 +351,7 @@ C102 ' Home assuming the home sensor is only active at the index (edge detection
 	ENDIF
 
 RETURN
+
 
 C101 'HOME at the limits'
 	SLD
@@ -454,7 +455,7 @@ C110 'Get out of limit
 	'Algorithm:
 	' 1. If in neg limit, move positive 5000 counts
 	' 2. If in pos limit, move negative 5000 counts
-	PRINT("MOVING OUT OF LIMIT", #13)
+	IF DEBUG PRINT("MOVING OUT OF LIMIT", #13) ENDIF
 	MP
 	IF NEG_LIMIT_RT == 1
 		IF DEBUG == 1 PRINT("NEG LIMIT", #13) ENDIF
@@ -497,8 +498,8 @@ C120 'Set the software limits
 			VST(POS_SLIMIT, 1)
 			
 			GOSUB110
-			PRINT("POS SLIMIT ")
-			PRINT(SLP, #13)
+			IF DEBUG PRINT("POS SLIMIT ") ENDIF
+			IF DEBUG PRINT(SLP, #13) ENDIF
 			MV
 			VT=-MAXV/4
 			G
@@ -509,26 +510,26 @@ C120 'Set the software limits
 
 			EPTR = EEP_SOFTWARE_LIMIT
 			VST(NEG_SLIMIT, 1)
-			PRINT("NEG SLIMIT ")
-			PRINT(SLN, #13)
+			IF DEBUG PRINT("NEG SLIMIT ") ENDIF
+			IF DEBUG PRINT(SLN, #13) ENDIF
 			GOSUB110
 			SLE
 		ELSE
-			PRINT("MOTOR NOT HOMED", #13)
+			IF DEBUG PRINT("MOTOR NOT HOMED", #13) ENDIF
 		ENDIF
 	ELSE
-		PRINT("MOTOR NOT READY", #13)
+		IF DEBUG PRINT("MOTOR NOT READY", #13) ENDIF
 	ENDIF
 RETURN
 
 
 
-C200 ' Home sub assuming the home switch is active half of the travel.
+C105 ' Home sub assuming the home switch is active half of the travel.
 		' This is only used for a test linear stage. 
-	PRINT("Homing Motor", #13)
+	IF DEBUG PRINT("Homing Motor", #13) ENDIF
 	MV
 	IF IN(10) == 0 ' positive side of home
-		PRINT("MOVING toward home form positive side", #13)
+		IF DEBUG PRINT("MOVING toward home form positive side", #13) ENDIF
 		VT=-MAXV/2
 		G
 		WHILE IN(10) == 0 LOOP
@@ -540,7 +541,7 @@ C200 ' Home sub assuming the home switch is active half of the travel.
 	MV
 	VT=MAXV/2
 	G
-	PRINT("HOMING From negative side", #13)
+	IF DEBUG PRINT("HOMING From negative side", #13) ENDIF
 	WHILE IN(10) == 1
 		b=PA
 	LOOP
@@ -552,7 +553,7 @@ C200 ' Home sub assuming the home switch is active half of the travel.
 	G
 	TWAIT
 	O=0
-	PRINT("HOMED", #13)
+	IF DEBUG PRINT("HOMED", #13) ENDIF
 RETURN 
 
 
@@ -678,7 +679,7 @@ C0  ' Startup stuff the head node motor
 
 	Zs
 	WHILE Bs==1 
-		PRINT("COMMAD ERROR", #13)
+		IF DEBUG PRINT("COMMAD ERROR", #13) ENDIF
 		WAIT=3000
 	LOOP
 	MAXV:FWHEEL_LOWER = 10000
@@ -737,7 +738,7 @@ C1 ' All nodes startup
 	LOOP
 	xxx = 2
 	IF CADDR == HEAD_NODE
-		PRINT( "Starting setup for all motors", #13 )
+		IF DEBUG PRINT( "Starting setup for all motors", #13 ) ENDIF
 	ENDIF
 	xxx = 3
 	VT=MAXV
@@ -786,32 +787,34 @@ C50 ' Attempt to find spare
 RETURN
 
 C998 'Send out telemetry data
+		' This should only be called on the head node
 	MOTORII = 1
 	WHILE MOTORII < 8
-		PRINT( MOTORII, " " )
-		DUMMYVAR = PA:MOTORII
-		PRINT( DUMMYVAR, " " )
+		PRINT( MOTORII, " " )' MOTOR NUM
+		DUMMYVAR = PA:MOTORII 
+		PRINT( DUMMYVAR, " " ) ' POSITION
 		DUMMYVAR = f:MOTORII
-		PRINT( DUMMYVAR, " " )
-		DUMMYVAR = W(0):MOTORII
-		PRINT( DUMMYVAR, " " )
-		DUMMYVAR = W(1):MOTORII
-		PRINT( DUMMYVAR, " " )
+		PRINT( DUMMYVAR, " " ) ' FILTER NUMBER
+		DUMMYVAR = W(0):MOTORII 
+		PRINT( DUMMYVAR, " " ) ' STATUS WORD 0
+		DUMMYVAR = W(1):MOTORII 
+		PRINT( DUMMYVAR, " " )' STATUS WORD 1
 		DUMMYVAR = W(3):MOTORII
-		PRINT( DUMMYVAR, " " )
-		DUMMYVAR = W(4):MOTORII
-		PRINT( DUMMYVAR, " " )
-		DUMMYVAR = W(12):MOTORII 'User bits
-		PRINT( DUMMYVAR, " " )
-		DUMMYVAR = W(16):MOTORII ' IO
-		PRINT( DUMMYVAR, " " )
-		PRINT(#13)
+		PRINT( DUMMYVAR, " " ) ' STATUS WORD 2
+		DUMMYVAR = W(4):MOTORII 
+		PRINT( DUMMYVAR, " " ) ' STATUS WORD 3
+		DUMMYVAR = W(12):MOTORII 
+		PRINT( DUMMYVAR, " " )'User bits
+		DUMMYVAR = W(16):MOTORII 
+		PRINT( DUMMYVAR, " " )' IO
+		PRINT(#13) ' Carriage retrun
+
 		MOTORII = MOTORII + 1
 	LOOP
 RETURN
 
 
-C999 ' print map of motor number to name
+C999 ' Print map of motor number to name
 
 	PRINT("MOTOR #", QOFFSET_X, " OFFSET_X", #13)
 	PRINT("MOTOR #", QOFFSET_Y, " OFFSET_Y", #13)
