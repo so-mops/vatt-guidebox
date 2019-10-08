@@ -47,7 +47,9 @@
 #define MOT6_GROUP "MOTOR 6 Eng"
 #define MOT7_GROUP "MOTOR 7 Eng"
 
-#define POLLMS          250                             /* poll period, ms */
+#define ENCODER2MM (1.0/1900.0)
+
+#define POLLMS          100                             /* poll period, ms */
 
 #define NET 0
 #define SER 1
@@ -112,7 +114,7 @@ ISwitchVectorProperty actionSP      = { mydev, "GUIDE_BOX_ACTIONS", "Guide Box A
 
 
 //Upper Filter Goto
-static INumber ufwNR[] = {{"FWHEEL_UPPER","Upper Filter", "%f",0., 0., 0., 0., 0, 0, 0}, };
+static INumber ufwNR[] = {{"FWHEEL_UPPER", "Upper Filter", "%f",0., 0., 0., 0., 0, 0, 0}, };
 
  static INumberVectorProperty ufwNPR = {  mydev, "FWHEEL_UPPER", "Upper Filter Wheel goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  ufwNR, NARRAY(ufwNR), "", 0};
 
@@ -122,29 +124,48 @@ static INumber lfwNR[] = {{"FWHEEL_LOWER","Lower Filter", "%f",0., 0., 0., 0., 0
  static INumberVectorProperty lfwNPR = {  mydev, "FWHEEL_LOWER", "Lower Filter Wheel goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  lfwNR, NARRAY(lfwNR), "", 0};
 
 //Offset X Goto
-static INumber offxNR[] = {{"OFFSET_X","Offset X Position", "%f",0., 0., 0., 0., 0, 0, 0}, };
+static INumber offxNR[] = {{"OFFSET_X","Offset X Position", "%5.2f",0., 0., 0., 0., 0, 0, 0}, };
 
  static INumberVectorProperty offxNPR = {  mydev, "OFFSET_X", "offset x goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  offxNR, NARRAY(offxNR), "", 0};
 
 //Offset Y Goto
-static INumber offyNR[] = {{"OFFSET_Y","Offset Y Position", "%f",0., 0., 0., 0., 0, 0, 0}, };
+static INumber offyNR[] = {{"OFFSET_Y","Offset Y Position", "%5.2f",0., 0., 0., 0., 0, 0, 0}, };
 
  static INumberVectorProperty offyNPR = {  mydev, "OFFSET_Y", "offset y goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  offyNR, NARRAY(offyNR), "", 0};
 
 //Offset Focus Goto
-static INumber offFocNR[] = {{"OFFSET_FOCUS","Offset Focus", "%f",0., 0., 0., 0., 0, 0, 0}, };
+static INumber offFocNR[] = {{"OFFSET_FOCUS","Offset Focus", "%5.2f",0., 0., 0., 0., 0, 0, 0}, };
 
  static INumberVectorProperty offFocNPR = {  mydev, "OFFSET_FOCUS", "offset foc goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  offFocNR, NARRAY(offFocNR), "", 0};
 
 //Offset Mirror Goto
-static INumber offMirrNR[] = {{"OFFSET_MIRRORS","Offset Mirror Position", "%f",0., 90., 0., 0., 0, 0, 0}, };
+static INumber offMirrNR[] = {{"OFFSET_MIRRORS","Offset Mirror Position", "%5.2f",0., 90., 0., 0., 0, 0, 0}, };
 
 static INumberVectorProperty offMirrNPR = {  mydev, "OFFSET_MIRRORS", "offset mirror goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  offMirrNR, NARRAY(offMirrNR), "", 0};
 
 //Offset Filter Goto
-static INumber ofwNR[] = {{"OFFSET_FWHEEL","Offset Filter Position", "%f",0., 90., 0., 0., 0, 0, 0}, };
+static INumber ofwNR[] = {{"OFFSET_FWHEEL","Offset Filter Position", "%5.2f",0., 90., 0., 0., 0, 0, 0}, };
 
 static INumberVectorProperty ofwNPR = {  mydev, "OFFSET_FWHEEL", "offset filter goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  ofwNR, NARRAY(ofwNR), "", 0};
+
+
+
+/*
+ * 		A note on Text Properties in INDI:
+ *		Each IText struct has a char pointer
+ *		member named "text". The memory this pointer
+ *		points to needs to be allocated. I do this 
+ *		in this module by creating a global char 
+ *		array like head_nodeString. We might be able 
+ *		to do this with a malloc but the memory 
+ *		needs to globally accessible  because all 
+ *		our VectorProperties are global. Doing this 
+ *		statically with a char arrays seems like the way to go. 
+ *		As far as I can tell, this causes IUUpdateText to 
+ *		flip out and give a seg fault. Instead of IUUpdate, 
+ *		I use strcpy to copy whatever text I want to the 
+ *		IText.text memeber and update the client with IDSetText. 
+ */
 
 
 // Head Node Name
@@ -218,13 +239,12 @@ typedef struct _INDIMOTOR
 	ISwitchVectorProperty engSwitchesSP;
 	ISwitch engSwitchesS[2];
 	
-
 	int motor_num; //CAN address
 
 } INDIMOTOR;
 
 //The structures in this array are filled
-//in the fill motors function.
+//in the fillmotors function.
 
 INDIMOTOR indi_motors[7];
 
@@ -341,12 +361,6 @@ char rawCmdString[50];
 	if( !strcmp(name, "COM") )
 	{
 		
-		/*After trying for hours this is the only way 
-		I cant seem to update a TP 
-		IUUpdate, IUSaveText, strcpy, strncpy 
-		so instead we point text member to texts[0]
-		and update a global variable like a chump.
-		*/
 		IText *tp = IUFindText( &ttyPortTP, names[0] );
 		strcpy(gttyPORT, texts[0]);
 		
@@ -363,12 +377,20 @@ char rawCmdString[50];
 			//TODO: we might want to make this part of the 
 			//gb_commands if we are trying to stay away from
 			//directo moog_* class.
+			//
+			//TODO: for someone reason I cant seem
+			//to get variables back from the drives
+			//eg. Rqq should respone with integer in
+			//qq but I never see a response
+			IDMessage(mydev, "WRITING...");
 			moog_write( RS485_FD, texts[0] );
-			usleep(2000);
-			moog_read( RS485_FD, respbuff );
+			usleep(50000);
+			IDMessage(mydev, "READING...");
+			moog_read(RS485_FD, respbuff);
 			strcpy(rawCmdT[0].text, respbuff );
 			rawCmdT[0].text[strlen(respbuff)] = '\0';
-			IDSetText(&rawCmdTP, NULL);
+			IDMessage(mydev, "Are we here %s", respbuff);
+			IDSetText(&rawCmdTP, "Response is %s", respbuff);
 		}
 	}
 	if( !strcmp(name, "LOWER_FNAMES") )
@@ -406,6 +428,7 @@ char rawCmdString[50];
  	return;
  }
 
+
 /*############################################################################
 #  Title: ISNewNumber
 #  Author: C.Johnson
@@ -424,9 +447,6 @@ char rawCmdString[50];
              return;
  
 
-		
-	
-	 	 
 
 	if (!strcmp (name, offFocNPR.name)) {
              /* new Focus Position */
@@ -439,7 +459,7 @@ char rawCmdString[50];
                  return;
              }
 	     
-             stageGoTo(RS485_FD, offFocNPR.name, (int)values[0]);
+             stageGoTo(RS485_FD, offFocNPR.name, (int)values[0]/ENCODER2MM);
 	
 	     offFocNPR.s = IPS_IDLE;
 	     IDSetNumber(&offFocNPR, NULL);
@@ -455,7 +475,7 @@ char rawCmdString[50];
                  return;
              }
              
-             stageGoTo(RS485_FD, offxNPR.name, (int)values[0]);
+             stageGoTo(RS485_FD, offxNPR.name, (int)values[0]/ENCODER2MM);
 	
 	     offxNPR.s = IPS_IDLE;
 	     IDSetNumber(&offxNPR, NULL);
@@ -471,7 +491,7 @@ char rawCmdString[50];
                  return;
              }
              
-             stageGoTo(RS485_FD, offyNPR.name, (int)values[0]);
+             stageGoTo(RS485_FD, offyNPR.name, (int)values[0]/ENCODER2MM);
 	
 	     offyNPR.s = IPS_IDLE;
 	     IDSetNumber(&offyNPR, NULL);
@@ -535,7 +555,7 @@ char rawCmdString[50];
                  return;
              }
              
-             stageGoTo(RS485_FD, offMirrNPR.name, (int)values[0]);
+             stageGoTo(RS485_FD, offMirrNPR.name, (int)values[0]/ENCODER2MM);
 
 	     offMirrNPR.s = IPS_IDLE;
 	     IDSetNumber(&offMirrNPR, NULL);
@@ -719,7 +739,7 @@ char respbuffer[50];
 		} /* end for */
 	}
 	else
-	{
+	{// This is the motor specific engineering tools
 		for ( INDIMOTOR *imotor=indi_motors; imotor!=indi_motors+7; imotor++ )
 		{
 			if( !strcmp(name, imotor->engSwitchesSP.name) )
@@ -732,13 +752,12 @@ char respbuffer[50];
 					}
 					else if( !strcmp( names[ii], imotor->engSwitchesS[1].name ) )
 					{
+						moog_callsub(RS485_FD, 104, imotor->motor_num);
 					}
 				}
-				moog_callsub(RS485_FD, 110, imotor->motor_num);
-				moog_read(RS485_FD, respbuffer);
 				imotor->engSwitchesS[0].s = ISS_OFF;
 				imotor->engSwitchesS[1].s = ISS_OFF;
-				IDSetSwitch(&imotor->engSwitchesSP, "Moving %s out of limit resp is %s.", imotor->nameT[0].text, respbuffer );
+				IDSetSwitch(&imotor->engSwitchesSP, NULL );
 			}
 		}
 
@@ -889,6 +908,7 @@ static int guiderTelem(int init_struct)
 	INumberVectorProperty *pNVP;
 	ILight *statusLight;
 	ILightVectorProperty *statusLightVP;
+	int iter=1;
 
 	ISwitch *ioBitSwitch;
 	ISwitchVectorProperty *ioBitSwitchVector;
@@ -947,20 +967,39 @@ static int guiderTelem(int init_struct)
 		pNVP = motor2nvp(motor);
 		if(pNVP == NULL)
 		{//stuct did not init properly.
-			IDMessage(mydev, "allmotors struct was not initalized correctly. This indicates a communication failure.");
+			IDMessage(mydev, "%i Motor %s (Num %i) was not intialized correctly in the allmotors array. This indicates a communication failure.", iter, motor->name, motor->motor_num);
 			//We should probably bail out and disconnect here.
 			continue;
 		}
 		if ( motor->isActive )
 		{/*motor->isActive tells us weather the head node was able to communicate with 
 		 motor over the can bus.*/
+			if ( motor->inNegLimit )
+			{
+				pNVP->s = IPS_ALERT; //Motor is homed and ready to go
+				IDMessage(mydev, "%s in negative limit!", motor->name);
+			}
+			else if(motor->inPosLimit)
+			{
+				pNVP->s = IPS_ALERT; //Motor is homed and ready to go
+				IDMessage(mydev, "%s in positive limit!", motor->name);
+			}
+
+			else if(!motor->isHomed)
+			{
+				pNVP->s = IPS_BUSY; 
+			}
+			else if(motor->isHomed && !motor->isMoving)
+			{
+				pNVP->s = IPS_OK; 
+			}
+			else if(motor->isHomed && motor->isMoving)
+			{
+				pNVP->s = IPS_BUSY;
+			}
 			
-			if(motor->isHomed)
-				pNVP->s = IPS_OK; //Motor is homed and ready to go 
-			else
-				pNVP->s = IPS_BUSY; // Motor is not homed. Let user know. 
-			
-			pNVP->np[0].value = motor->pos;
+
+			pNVP->np[0].value = motor->pos*ENCODER2MM;
 			statusLight = indi_motors[motor->motor_num-1].word0L;
 			statusLightVP = &indi_motors[motor->motor_num-1].word0LP;
 			ioBitSwitch = indi_motors[motor->motor_num-1].iowordS;
@@ -991,18 +1030,24 @@ static int guiderTelem(int init_struct)
 					}
 
 				}
+
+				//TODO: the SetLight and SetSwitch only need to be called
+				//if the io or status words change.
+				//THis could help keep communication to 
+				//the client minimal. We could keep a 
+				//copy of the allmotors array before any
+				//changes are made and compare it after 
+				//we run through this loop.
 				IDSetLight(statusLightVP, NULL);
 				IDSetSwitch(ioBitSwitchVector, NULL );
 			}
 
-
 		}
-		else
-			pNVP->s = IPS_ALERT;
 
 		//snprintf(mname, 30, "M%i", motor->motor_num);
 
 		
+		iter++;
 		IDSetNumber(pNVP, NULL);
 	}
 

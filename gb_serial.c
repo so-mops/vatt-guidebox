@@ -362,7 +362,7 @@ int moog_write( int rs485_fd, const char *msg )
 
 	
 	snprintf(send_buffer, strlen(msg)+2, "%s ", msg );
-	printf("sending <%s>\n", send_buffer);
+	//fprintf(stderr, "sending <%s>\n", send_buffer);
 	write( rs485_fd, send_buffer, strlen(send_buffer) );
 }
 
@@ -421,9 +421,9 @@ int moog_read( int rs485_fd, char resp[] )
 int moog_callsub( int rs485_fd, int subnum, int can_addr )
 {
 
-	char msg[12];
+	char msg[20];
 	if( can_addr == -1 )//head node
-		snprintf( msg, 12, "GOSUB(%i)", subnum );
+		snprintf( msg, 20, "GOSUB(%i)", subnum );
 	else
 		snprintf( msg, 20, "GOSUB(%i):%i", subnum, can_addr );
 	moog_write( rs485_fd, msg );
@@ -484,12 +484,18 @@ int moog_home( int rs485_fd, int can_addr )
 	switch(can_addr)
 	{
 		case -1: //Home all in series
-			 moog_callsub( rs485_fd, 100, can_addr );
+			moog_callsub( rs485_fd, 100, can_addr );
+		break;
 		case OFFSET_X:
 		case OFFSET_Y:
 		case OFFSET_FOCUS:
 		case OFFSET_MIRRORS:
-			moog_callsub( rs485_fd, 102, can_addr );
+			moog_callsub( rs485_fd, 103, can_addr );
+		break;
+		case OFFSET_FWHEEL:
+		case FWHEEL_UPPER:
+		case FWHEEL_LOWER:
+			moog_callsub( rs485_fd, 103, can_addr );
 		break;
 		default:
 			printf("Motor %i can not be homed yet", can_addr);
@@ -724,6 +730,7 @@ int moog_getallstatus_quick(int rs485_fd, MSTATUS motors[])
 	int read_status=0;
 	int motor_num=0, pos, f, w0, w1, w2, w3, userbits, iobits;
 	int wc, active;
+	moog_read(rs485_fd, resp);//Flush the line
 	moog_callsub( rs485_fd, 998, -1);
 	while(motor_num <7 )
 	{
@@ -731,6 +738,7 @@ int moog_getallstatus_quick(int rs485_fd, MSTATUS motors[])
 		wc = sscanf(resp, "%i %i %i %i %i %i %i %i %i", &motor_num, &pos, &f, &w0, &w1, &w2, &w3, &userbits, &iobits );
 		if (wc != 9)
 			continue;
+		//fprintf(stderr, "%i %i %i %i %i %i %i %i %i\n", motor_num, pos, f, w0, w1, w2, w3, userbits, iobits );
 		for(MSTATUS *motor=motors; motor!=motors+NMOTORS; motor++)
 		{
 			if(motor_num == motor->motor_num)
@@ -744,6 +752,9 @@ int moog_getallstatus_quick(int rs485_fd, MSTATUS motors[])
 				motor->userbits = userbits;
 				motor->iobits = iobits;
 				motor->isActive = 1;
+				motor->inPosLimit = w0 & (1<<16);
+				motor->inNegLimit = w0 & (1<<15);
+				motor->isMoving = w0 & (1<<2);
 				motor->isHomed = userbits & 1;
 				active = (1<<motor->motor_num) | active;
 			}
@@ -810,6 +821,9 @@ int build_stat_structs( int rs485_fd, MSTATUS motors[] )
 {
 	char resp[READSIZE];
 	moog_read(rs485_fd, resp); //flush line
+	fprintf(stderr, "\nflush gives %s\n", resp);
+	moog_read(rs485_fd, resp); //flush line
+	fprintf(stderr, "flush gives %s\n", resp);
 	int wc;
 	int head_node;
 
@@ -822,6 +836,7 @@ int build_stat_structs( int rs485_fd, MSTATUS motors[] )
 	for(int ii=0; ii<7; ii++ )
 	{
 		moog_read( rs485_fd, resp );
+		fprintf(stderr, "%i %s\n", ii, resp);
 		wc = sscanf(resp, "MOTOR #%i %s", &motors[ii].motor_num, motors[ii].name );
 		motors[ii].head_node = head_node;
 		if( strcmp(motors[ii].name, "OFFSET_FWHEEL") == 0 )
