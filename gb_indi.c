@@ -906,8 +906,21 @@ static int guiderTelem(int init_struct)
 	IText * tp;
 	MSTATUS *mstat;
 	INumberVectorProperty *pNVP;
-	ILight *statusLight;
-	ILightVectorProperty *statusLightVP;
+	ILight *w0_statusLight;
+	ILightVectorProperty *w0_statusLightVP;	
+
+	ILight *w1_statusLight;
+	ILightVectorProperty *w1_statusLightVP;	
+
+	//not implented yet
+	ILight *w2_statusLight;
+	ILightVectorProperty *w2_statusLightVP;	
+	
+	ILight *userbitsLights;
+	ILightVectorProperty *userBitsVP;
+	//end not implemented 
+	
+
 	int iter=1;
 
 	ISwitch *ioBitSwitch;
@@ -1000,12 +1013,14 @@ static int guiderTelem(int init_struct)
 			
 
 			pNVP->np[0].value = motor->pos*ENCODER2MM;
-			statusLight = indi_motors[motor->motor_num-1].word0L;
-			statusLightVP = &indi_motors[motor->motor_num-1].word0LP;
+			w0_statusLight = indi_motors[motor->motor_num-1].word0L;
+			w0_statusLightVP = &indi_motors[motor->motor_num-1].word0LP;
+			w1_statusLight = indi_motors[motor->motor_num-1].word1L;
+			w1_statusLightVP = &indi_motors[motor->motor_num-1].word1LP;
 			ioBitSwitch = indi_motors[motor->motor_num-1].iowordS;
 			ioBitSwitchVector = &indi_motors[motor->motor_num-1].iowordSP;
 
-			if(statusLight != NULL)
+			if(w0_statusLight != NULL)
 			{
 				for(int sbit=0; sbit<16; sbit++)
 				{	
@@ -1013,12 +1028,22 @@ static int guiderTelem(int init_struct)
 					if(motor->words[0] & (1<<sbit))
 					{
 						//IDMessage(mydev, "%s %s %i bit is %s", statusLightVP->name, motor->name, motor->words[0], statusLight[sbit].name);
-						statusLight[sbit].s = IPS_ALERT;
+						w0_statusLight[sbit].s = IPS_ALERT;
 					}
 					else
 					{
-						statusLight[sbit].s = IPS_IDLE;
+						w0_statusLight[sbit].s = IPS_IDLE;
 					}
+					if(motor->words[0] & (1<<sbit))
+					{
+						w1_statusLight[sbit].s = IPS_ALERT;
+					}
+					else
+					{
+						w1_statusLight[sbit].s = IPS_IDLE;
+					}
+
+
 
 					if(motor->iobits & (1<<sbit))
 					{
@@ -1038,7 +1063,8 @@ static int guiderTelem(int init_struct)
 				//copy of the allmotors array before any
 				//changes are made and compare it after 
 				//we run through this loop.
-				IDSetLight(statusLightVP, NULL);
+				IDSetLight(w0_statusLightVP, NULL);
+				IDSetLight(w1_statusLightVP, NULL);
 				IDSetSwitch(ioBitSwitchVector, NULL );
 			}
 
