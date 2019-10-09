@@ -59,18 +59,31 @@
 #define GET_HOMING_SENSOR IN(0) 
 #define GET_FILTER_SENSOR IN(1)
 
-#define ENGAGE_SOLENOID OS(9):FWHEEL_UPPER
-#define RELEASE_SOLENOID OR(9):FWHEEL_UPPER
+#define RETRACT_SOLENOID GOSUB(410):FWHEEL_UPPER
+#define RELEASE_SOLENOID GOSUB(411):FWHEEL_UPPER
+
+
 #define HOME_SENSOR IN(0)
 #define FILTER_SENSOR IN(1)
 
-
-
 #define SET_NODE_READY US(14)
-#define GET_NODE_READY B(12, 14)
+#define GET_NODE_READY B(12,14)
+
+' User bit 8 on the upper filter wheel 
+' is our lock for filterwheel motion
+#define SET_FWHEEL_MOVING US(8):FWHEEL_UPPER
+#define UNSET_FWHEEL_MOVING UR(8):FWHEEL_UPPER
+
+#define SET_WATCH_FWHLS US(9):FWHEEL_UPPER
+#define UNSET_WATCH_FWHLS UR(9):FWHEEL_UPPER
+#define GET_WATCH_FWHLS B(12,9):FWHEEL_UPPER
+
+#define GET_FWHEEL_MOVING B(12,8):FWHEEL_UPPER
+
+#define ISMOVING B(0,2)
 
 
-
+#define MOTORON B(0,1) !| 1
 #define HEAD_NODE_SETUP_DONE gg
 
 #define FILTER_DIST hh ' Number of counts between filters 
@@ -89,6 +102,13 @@
 #define MOTORII pp
 #define DUMMYVAR qq
 
+#define DUMMYVAR1 rr
+#define DUMMYVAR2 ss
+#define DUMMYVAR3 tt
+#define DUMMYVAR4 uu
+
+#define OTHER_FWHEEL vv
+#define IS_MAIN_FWHEEL ww
 BAUD115200
 ECHO_OFF
 DEBUG = 1
@@ -98,54 +118,55 @@ GOSUB1
 
 SWITCH CADDR
 
-CASE OFFSET_X 
-	' We use the defualt servo constants for Linear starges
-BREAK
-CASE OFFSET_Y 
+	CASE OFFSET_X 
+		' We use the defualt servo constants for Linear starges
+	BREAK
+	CASE OFFSET_Y 
 
-BREAK
-CASE FWHEEL_LOWER
-	IF DEBUG == 1 PRINT("SETTING UP FWHEEL_LOWER", #13) ENDIF
-	EIGN(2)
-	EIGN(3)
-	SLD
-	ZS
-	KP=8000
-	KI=10
-	KD=9000
-	KL=40
-	WAIT=500
-	F
-	
-BREAK
-CASE FWHEEL_UPPER
-	IF DEBUG == 1 PRINT("SETTING UP FWHEEL_LOWER", #13) ENDIF
-	EIGN(2)
-	EIGN(3)
-	SLD
-	ZS
-	KP=8000
-	KI=10
-	KD=9000
-	KL=40
-	WAIT=500
-	F
+	BREAK
+	CASE FWHEEL_LOWER
+		IF DEBUG == 1 PRINT("SETTING UP FWHEEL_LOWER", #13) ENDIF
+		EIGN(2)
+		EIGN(3)
+		SLD
+		ZS
+		KP=8000
+		KI=10
+		KD=9000
+		KL=40
+		WAIT=500
+		F
+		IS_MAIN_FWHEEL = 1
+		
+	BREAK
+	CASE FWHEEL_UPPER
+		IF DEBUG == 1 PRINT("SETTING UP FWHEEL_LOWER", #13) ENDIF
+		EIGN(2)
+		EIGN(3)
+		SLD
+		ZS
+		KP=8000
+		KI=10
+		KD=9000
+		KL=40
+		WAIT=500
+		F
+		IS_MAIN_FWHEEL = 1
+	BREAK
+	CASE OFFSET_FWHEEL
+		IF DEBUG == 1 PRINT("SETTING UP OFFSET_FWHEEL", #13) ENDIF
+		EIGN(2) ' Diable the negative limit
+		EIGN(3) ' Disable the positive limit
+		SLD ' Disable the software limits
+		ZS ' Clear the limits
+		KP=8000'Set the proportional gain
+		KI=10 ' Set the Integrator gain
+		KD=9000 ' Set the differential gain
+		KL=40 ' Set the integrator clip
+		WAIT=500 ' We must wait half a second or F won't work 
+		F 'Apply servo values.
 
-BREAK
-CASE OFFSET_FWHEEL
-	IF DEBUG == 1 PRINT("SETTING UP OFFSET_FWHEEL", #13) ENDIF
-	EIGN(2) ' Diable the negative limit
-	EIGN(3) ' Disable the positive limit
-	SLD ' Disable the software limits
-	ZS ' Clear the limits
-	KP=8000'Set the proportional gain
-	KI=10 ' Set the Integrator gain
-	KD=9000 ' Set the differential gain
-	KL=40 ' Set the integrator clip
-	WAIT=500 ' We must wait half a second or F won't work 
-	F 'Apply servo values.
-
-BREAK
+	BREAK
 
 ENDS
 
@@ -184,6 +205,7 @@ C104
 		BREAK
 	ENDS
 RETURN
+
 
 C103 ' Home assuming the home sensor is only active at the index (edge detection)
 	' This subroutine is only used for the linear stages.
@@ -241,7 +263,17 @@ C103 ' Home assuming the home sensor is only active at the index (edge detection
 				IF DEBUG == 1 PRINT("HOME SENSOR TRIPPED", #13) ENDIF
 				b=PA
 				BREAK
-			ENDIF
+			
+			ELSEIF NEG_LIMIT_RT ' oops we hit a limit
+				GOSUB(110) ' move out of the limit
+				MP
+				PRT=20000
+				G TWAIT ' Move passed the home sensor 
+				IF DEBUG == 1 PRINT("Hit limit first moving back", #13) ENDIF
+				MV
+				VT=HOME_DIRECTION*MAXV/4 ' start again
+				G
+			ENDIF	
 		LOOP
 		
 		X TWAIT
@@ -300,26 +332,26 @@ C102 ' Home assuming the home sensor is only active at the index (edge detection
 		
 		TURN_ON_HOMING_IRLED
 
-		' If we are one of the main filter wheels
-		' release the solenoide
-		IF CADDR == FWHEEL_LOWER RELEASE_SOLENOID
-		ELSEIF CADDR == FWHEEL_UPPER RELEASE_SOLENOID
-		ENDIF
-		'TODO: we need to detect whether or not the 
-		'	solenoid actually released.
+		IF IS_MAIN_FWHEEL
+			RETRACT_SOLENOID
+		ENDIF	
 
 		MV
 		VT=MAXV/2
 		G
-
-		
+	
 		WHILE 1 
 		' Wait till homing sensor state changes
 		' and record position of home sensor
+			IF IS_MAIN_FWHEEL 
+				GOSUB(499):FWHEEL_LOWER 
+				GOSUB(499):FWHEEL_UPPER 
+			ENDIF
 			IF HOME_SENSOR == HOME_ACTIVE_STATE
-				IF DEBUG == 1 PRINT("HOME SENSOR TRIPPED", #13) ENDIF
+				'IF DEBUG == 1 PRINT("HOME SENSOR TRIPPED", #13) ENDIF
 				IF FILTER_SENSOR == HOME_ACTIVE_STATE
-					IF DEBUG == 1 PRINT("FILTER SENSOR TRIPPED", #13) ENDIF
+					'IF DEBUG == 1 PRINT("FILTER SENSOR TRIPPED", #13) ENDIF
+				
 					b=PA
 					BREAK
 					
@@ -337,10 +369,10 @@ C102 ' Home assuming the home sensor is only active at the index (edge detection
 
 		O=0 ' Set origin at the home sensor position
 		SET_HOMED_BIT
+		IF IS_MAIN_FWHEEL GOSUB498 ENDIF
 		OFF
-		IF CADDR == FWHEEL_UPPER ENGAGE_SOLENOID
-		ELSEIF CADDR == FWHEEL_LOWER ENGAGE_SOLENOID
-		ENDIF
+
+		
 		
 		TURN_OFF_HOMING_IRLED
 		VT=MAXV
@@ -666,8 +698,8 @@ C0  ' Startup stuff the head node motor
 	DECEL:FWHEEL_UPPER = 2
 	FILTER_DIST:FWHEEL_UPPER =1600
 	HOME_OFFSET:FWHEEL_UPPER = 0
-	HOME_INACTIVE_STATE:FWHEEL_UPPER = 0
-	HOME_ACTIVE_STATE:FWHEEL_UPPER = 1
+	HOME_INACTIVE_STATE:FWHEEL_UPPER = 1
+	HOME_ACTIVE_STATE:FWHEEL_UPPER = 0
 	HOME_DIRECTION:FWHEEL_UPPER = -1
 	WAIT=100
 	IF Bs == 1
@@ -687,8 +719,8 @@ C0  ' Startup stuff the head node motor
 	DECEL:FWHEEL_LOWER = 2
 	FILTER_DIST:FWHEEL_LOWER = 1600
 	HOME_OFFSET:FWHEEL_LOWER = 0
-	HOME_INACTIVE_STATE:FWHEEL_UPPER = 0
-	HOME_ACTIVE_STATE:FWHEEL_UPPER = 1
+	HOME_INACTIVE_STATE:FWHEEL_UPPER = 1
+	HOME_ACTIVE_STATE:FWHEEL_UPPER = 0
 	HOME_DIRECTION:FWHEEL_UPPER = 1
 	WAIT=100
 	IF Bs == 1
@@ -702,27 +734,43 @@ RETURN
 
 
 C400 ' go to filter
-	
+	SWITCH CADDR ' Bail if this isn't a filter wheel
+		CASE OFFSET_X
+			END
+		BREAK
+		CASE OFFSET_Y
+			END
+		BREAK
+		CASE OFFSET_FOCUS
+			END
+		BREAK
+		CASE OFFSET_MIRRORS
+			END
+		BREAK
+	ENDS
 	MP
 	IF f >= 0
 		IF f < 5
 			PT = f * FILTER_DIST
-			'TURN_ON_HOMING_IRLED
-			IF CADDR != OFFSET_FWHEEL
-				RELEASE_SOLENOID
-			ENDIF
-			' TODO: we need to verify the solenoid released.
-			G TWAIT
 			
+			IF CADDR != OFFSET_FWHEEL
+				RETRACT_SOLENOID
+			ENDIF
+			
+			G 
+			WHILE ISMOVING
+			
+				IF IS_MAIN_FWHEEL 
+					GOSUB(499):FWHEEL_LOWER
+					GOSUB(499):FWHEEL_UPPER
+				ENDIF
+			LOOP
 			
 			IF FILTER_SENSOR == 0
 				IF DEBUG PRINT("WE are on the filter!", #13) ENDIF
 			ENDIF
 			'TURN_OFF_HOMING_IRLED
-			IF CADDR != OFFSET_FWHEEL
-				ENGAGE_SOLENOID
-			ENDIF
-			
+			IF IS_MAIN_FWHEEL GOSUB(498) ENDIF
 			OFF
 		ENDIF
 	ENDIF
@@ -784,6 +832,73 @@ RETURN
 
 
 C50 ' Attempt to find spare
+RETURN
+
+C410 ' Retract the solenoid
+	IF CADDR != FWHEEL_UPPER
+		END
+	ENDIF
+	OS(7) OS(8)
+	OS(9)
+	WAIT=100
+	WHILE IN(6) == 0
+		WAIT=100
+	LOOP
+	IF DEBUG PRINT("SOLENOID RETRACTED", #13) ENDIF
+RETURN
+
+C411 ' Release the solenoid
+	IF CADDR != FWHEEL_UPPER
+		END
+	ENDIF
+	OR(9)
+	OS(7) OS(8)
+	WAIT=100
+	WHILE IN(6) == 1
+		WAIT=100
+	LOOP
+	IF DEBUG PRINT("SOLENOID RELEASED", #13) ENDIF
+	
+RETURN
+C498
+	IF CADDR == FWHEEL_UPPER
+		OTHER_FWHEEL = FWHEEL_LOWER
+	ELSE
+		OTHER_FWHEEL = FWHEEL_UPPER
+	ENDIF
+
+	WHILE ISMOVING:OTHER_FWHEEL
+		
+	LOOP
+	IF DEBUG PRINT("BOTH FWHEELS STOPPED", #13) ENDIF
+	OFF:FWHEEL_UPPER OFF:FWHEEL_LOWER
+	RELEASE_SOLENOID
+	
+RETURN
+
+C499 ' Watch the main filter wheels
+	
+	IF CADDR == FWHEEL_UPPER
+		OTHER_FWHEEL = FWHEEL_LOWER
+	ELSE
+		OTHER_FWHEEL = FWHEEL_UPPER
+	ENDIF
+	
+	IF ISMOVING
+		
+	ELSEIF MOTORON
+		
+	ELSE
+		'IF DEBUG PRINT("HOOOOOOOOOLD", #13) ENDIF
+		IF GET_HOMED_BIT
+			PT=f*FILTER_DIST 'Hold position
+			G
+		ELSE
+			PT=PA
+			G
+		ENDIF
+	ENDIF
+
 RETURN
 
 C998 'Send out telemetry data
