@@ -13,13 +13,13 @@
 
 typedef struct 
 {
-	int words[4];
+	int words[4]; //status words
 	int userbits;
 	int iobits;
 	int motor_num;//CAN bus address
 	int pos;
 	char name[20];
-	int fnum;
+	int fnum; //Filter position
 	int isActive;
 	int isFilter;
 	int isHomed;
@@ -27,6 +27,9 @@ typedef struct
 	int inPosLimit;
 	int isMoving;
 	int head_node;
+	int fdist; // distance in counts b/w filters
+	int neg_slimit;// negative software limits
+	int pos_slimit;//positive software limit
 
 
 } MSTATUS;

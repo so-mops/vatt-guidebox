@@ -516,8 +516,8 @@ int moog_home( int rs485_fd, int can_addr )
  * Description:
  *       Sends one of the linear stage motors
  *       to a new position. This works by setting 
- *       the position target (PT) on the motor
- *       and then sending the go command (G)
+ *       the position target 'PT' on the motor
+ *       and then sending go command 'GOSUB(500)'
  *       
  *
  * **************************************************/
@@ -527,8 +527,9 @@ int moog_lgoto(int rs485_fd, int can_addr, int pos )
 	snprintf( msg, 40, "PT:%i=%i", can_addr, pos );
 	moog_write(rs485_fd, (const char *) msg);
 	usleep(100); // this is probably not necessary
-	snprintf(msg, 40, "G:%i", can_addr );
-	moog_write(rs485_fd, (const char *) msg ); //GO!
+	//snprintf(msg, 40, "G:%i", can_addr );
+	//moog_write(rs485_fd, (const char *) msg ); //GO!
+	moog_callsub(rs485_fd, 500, can_addr);
 
 	return 0;
 }
@@ -661,6 +662,13 @@ int moog_getstatus(int rs485_fd, MSTATUS* stat)
 	return 0;
 }
 
+void moog_serialfix(int moogfd)
+{
+	
+	char serialfix=128; 
+	moog_write(moogfd, &serialfix);
+}
+
 /***************************************
  *Name: moog_getallstatus
  *Args: rs485_fd stat-> array of MSTATUS structs
@@ -731,6 +739,18 @@ int moog_getallstatus_quick(int rs485_fd, MSTATUS motors[])
 	int motor_num=0, pos, f, w0, w1, w2, w3, userbits, iobits;
 	int wc, active;
 	moog_read(rs485_fd, resp);//Flush the line
+
+	/* Something is causing the motors to not respond
+	 * when this happens we call the serialfix. At first
+	 * we were only doing this when the connection was
+	 * oponed. We are having a problem with the current
+	 * INDI driver where the motor does this a lot more
+	 * hopefully this is a temporary fix while we leave
+	 * find the cause of the motors not responding. 
+	 * --Scott 10/2019
+	 * */
+	moog_serialfix(rs485_fd);
+	usleep(1000);
 	moog_callsub( rs485_fd, 998, -1);
 	while(motor_num <7 )
 	{
@@ -820,6 +840,7 @@ void print_status(MSTATUS stat)
 int build_stat_structs( int rs485_fd, MSTATUS motors[] )
 {
 	char resp[READSIZE];
+	char msg[20];
 	moog_read(rs485_fd, resp); //flush line
 	fprintf(stderr, "\nflush gives %s\n", resp);
 	moog_read(rs485_fd, resp); //flush line
@@ -835,6 +856,12 @@ int build_stat_structs( int rs485_fd, MSTATUS motors[] )
 	moog_callsub(rs485_fd, 999, -1 );
 	for(int ii=0; ii<7; ii++ )
 	{
+		//TODO: We need to come up with a way to 
+		//determine if the response back from the motor
+		//is reliable. If a motor is not communicating 
+		//on the can bus (as long as its not the head),
+		//the response will be normal. This will require
+		//a change to the smartmotor program.
 		moog_read( rs485_fd, resp );
 		fprintf(stderr, "%i %s\n", ii, resp);
 		wc = sscanf(resp, "MOTOR #%i %s", &motors[ii].motor_num, motors[ii].name );
@@ -858,30 +885,33 @@ int build_stat_structs( int rs485_fd, MSTATUS motors[] )
 
 	}
 
-	/*
-	moog_read( rs485_fd, resp );
-	wc = sscanf(resp, "MOTOR #%i %s", &motors[0].motor_num, motors[0].name );
+	for( MSTATUS *motorii=motors; motorii!=motors+7; motorii++ )
+	{	
+		if(motorii->motor_num < 1 || motorii->motor_num > 7 )
+		{
+			continue;// Erroneous motor num
+		}
+		
+		//positive software limit
+		snprintf( msg, 20, "RSLP:%i", motorii->motor_num );
+		moog_write( rs485_fd, msg );
+		moog_read( rs485_fd, resp );
+		motorii->pos_slimit = atoi(resp);
 
-	moog_read( rs485_fd, resp );
-	wc = sscanf(resp, "MOTOR #%i %s", &motors[1].motor_num, motors[1].name );
+		//negative software limit
+		snprintf( msg, 20, "RSLN:%i", motorii->motor_num );
+		moog_write( rs485_fd, msg );
+		moog_read( rs485_fd, resp );
+		motorii->neg_slimit = atoi(resp);
 
-	moog_read( rs485_fd, resp);
-	wc = sscanf(resp, "MOTOR #%i %s", &motors[2].motor_num, motors[2].name );
 
-	moog_read( rs485_fd, resp );
-	wc = sscanf(resp, "MOTOR #%i %s", &motors[3].motor_num, motors[3].name );
-	
-	moog_read( rs485_fd, resp );
-	wc = sscanf(resp, "MOTOR #%i %s", &motors[4].motor_num, motors[4].name );
-
-	moog_read( rs485_fd, resp );
-	wc = sscanf(resp, "MOTOR #%i %s", &motors[5].motor_num, motors[5].name );
-
-	moog_read( rs485_fd, resp );
-	wc = sscanf(resp, "MOTOR #%i %s", &motors[6].motor_num, motors[6].name );
-	*/
-	
-
+		//filter_dist is stored in hh variable.
+		snprintf( msg, 20, "Rhh:%i", motorii->motor_num ); 
+		moog_write( rs485_fd, msg );
+		moog_read( rs485_fd, resp );
+		motorii->fdist = atoi(resp);
+		
+	}
 }
 
 

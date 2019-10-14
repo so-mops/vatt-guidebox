@@ -47,9 +47,9 @@
 #define MOT6_GROUP "MOTOR 6 Eng"
 #define MOT7_GROUP "MOTOR 7 Eng"
 
-#define ENCODER2MM (1.0/1900.0)
+#define ENCODER2MM (1.0/2000.0)
 
-#define POLLMS          100                             /* poll period, ms */
+#define POLLMS          500                             /* poll period, ms */
 
 #define NET 0
 #define SER 1
@@ -173,6 +173,27 @@ static IText head_nodeT[] = {{"HEAD", "Head Motor Node", "IDK?", 0, 0, 0}};
 static char head_nodeString[20];
 static ITextVectorProperty head_nodeTP = { mydev, "HEAD", "Head Motor Node", ENG_GROUP , IP_RO, 0, IPS_IDLE,  head_nodeT, NARRAY(head_nodeT), "", 0};
 
+static ISwitch lfS[]  = {
+	{"LF0S",  "",  ISS_OFF, 0, 0},
+	{"LF1S",  "",  ISS_OFF, 0, 0},
+	{"LF2S",  "",  ISS_OFF, 0, 0},
+	{"LF3S",  "",  ISS_OFF, 0, 0},
+	{"LF4S",  "",  ISS_OFF, 0, 0},
+	};
+
+ISwitchVectorProperty lfSP      = { mydev, "LFS", "Lower Wheel",  MAIN_GROUP, IP_RW, ISR_1OFMANY, 0, IPS_IDLE,  lfS, NARRAY(lfS), "", 0 };
+
+static ISwitch ufS[]  = {
+	{"UF0S",  "",  ISS_OFF, 0, 0},
+	{"UF1S",  "",  ISS_OFF, 0, 0},
+	{"UF2S",  "",  ISS_OFF, 0, 0},
+	{"UF3S",  "",  ISS_OFF, 0, 0},
+	{"UF4S",  "",  ISS_OFF, 0, 0},
+	};
+
+ISwitchVectorProperty ufSP      = { mydev, "UFS", "Upper Wheel",  MAIN_GROUP, IP_RW, ISR_1OFMANY, 0, IPS_IDLE,  ufS, NARRAY(ufS), "", 0 };
+
+
 // User given names for filters in lower filter wheel
 static IText lfnT[] = {
 	{"F0", "Filter 0", "", 0, 0, 0},
@@ -189,7 +210,7 @@ static ITextVectorProperty lfnTP = { mydev, "LOWER_FNAMES", "Lower Filter Wheel 
 
 // User given names for filters in upper filter wheel
 static IText ufnT[] = {
-	{"F0", "Filter 0", "", 0, 0, 0},
+	{"F0", "Filter 0", "SHIT", 0, 0, 0},
 	{"F1", "Filter 1", "", 0, 0, 0},
 	{"F2", "Filter 2", "", 0, 0, 0},
 	{"F3", "Filter 3", "", 0, 0, 0},
@@ -238,7 +259,13 @@ typedef struct _INDIMOTOR
 
 	ISwitchVectorProperty engSwitchesSP;
 	ISwitch engSwitchesS[2];
-	
+
+	INumberVectorProperty softLimitsNP;
+	INumber softLimitsN[2];
+
+	INumberVectorProperty fdistNP;
+	INumber fdsitN[1];
+
 	int motor_num; //CAN address
 
 } INDIMOTOR;
@@ -288,6 +315,9 @@ char rawCmdString[50];
 
 		IDDefText(&rawCmdTP, NULL);
 		rawCmdT[0].text = rawCmdString;
+
+		IDDefSwitch(&lfSP, NULL);
+		IDDefSwitch(&ufSP, NULL);
 
 		IDDefText(&head_nodeTP, NULL);
 		head_nodeT[0].text = head_nodeString;
@@ -400,8 +430,11 @@ char rawCmdString[50];
 		for(int jj=0; jj<n; jj++)
 		{
 			strcpy( lfnT[jj].text, texts[jj] );
+			strcpy(lfS[jj].label, texts[jj]);
 		}
 		IDSetText(&lfnTP, NULL );
+		IDDefSwitch(&lfSP, "UPDATING SWITCH" );
+		
 	}	
 	
 	if( !strcmp(name, "UPPER_FNAMES") )
@@ -458,7 +491,6 @@ char rawCmdString[50];
                  IDSetNumber(&offFocNPR, "Guider is offline.");
                  return;
              }
-	     
              stageGoTo(RS485_FD, offFocNPR.name, (int)values[0]/ENCODER2MM);
 	
 	     offFocNPR.s = IPS_IDLE;
@@ -475,7 +507,7 @@ char rawCmdString[50];
                  return;
              }
              
-             stageGoTo(RS485_FD, offxNPR.name, (int)values[0]/ENCODER2MM);
+             stageGoTo(RS485_FD, offxNPR.name, (int)(values[0]/ENCODER2MM));
 	
 	     offxNPR.s = IPS_IDLE;
 	     IDSetNumber(&offxNPR, NULL);
@@ -491,7 +523,7 @@ char rawCmdString[50];
                  return;
              }
              
-             stageGoTo(RS485_FD, offyNPR.name, (int)values[0]/ENCODER2MM);
+             stageGoTo(RS485_FD, offyNPR.name, (int)(values[0]/ENCODER2MM));
 	
 	     offyNPR.s = IPS_IDLE;
 	     IDSetNumber(&offyNPR, NULL);
@@ -555,7 +587,7 @@ char rawCmdString[50];
                  return;
              }
              
-             stageGoTo(RS485_FD, offMirrNPR.name, (int)values[0]/ENCODER2MM);
+             stageGoTo(RS485_FD, offMirrNPR.name, (int)(values[0]/ENCODER2MM));
 
 	     offMirrNPR.s = IPS_IDLE;
 	     IDSetNumber(&offMirrNPR, NULL);
@@ -587,6 +619,8 @@ char ret[20];
 ISState state;	
 int isDifferent;
 char respbuffer[50];
+char L, F, S;
+int fnum;
 
 	/* ignore if not ours */
 	if (strcmp (dev, mydev))
@@ -636,7 +670,6 @@ char respbuffer[50];
 	else if (!strcmp(name, connectSP.name))
 	{
 		sp = IUFindSwitch (&connectSP, names[0]);
-		IDMessage(mydev, "CONNECT HAS BEEN CALLED");
 		if (! strcmp(sp->name, connectS[0].name))
 		{
 			if(states[0] == ISS_ON)
@@ -738,6 +771,67 @@ char respbuffer[50];
 	 
 		} /* end for */
 	}
+	else if( !strcmp(name, lfSP.name) )
+	{
+		
+		if(connectS[0].s == ISS_OFF)
+		{
+			IUResetSwitch(&lfSP);
+
+			IDSetSwitch(&lfSP, "Not connected");
+			return;
+		}
+		for(int ii=0; ii<n; ii++)
+		{
+			if(states[ii] == ISS_ON );
+			{
+				int wc = sscanf(names[ii], "%*C%*C%i%*C", &fnum);
+				if(wc == 4)
+				{
+					IDMessage(mydev, "Could not match filter %s", names[ii] );
+				}
+				else
+				{
+
+					IDMessage( mydev, "Match for %i", fnum );
+					stageGoTo( RS485_FD, lfwNPR.name, fnum );
+				}
+
+			}
+		}
+	}	
+	else if( !strcmp(name, ufSP.name) )
+	{	
+		
+		if(connectS[0].s == ISS_OFF)
+		{
+			IUResetSwitch(&ufSP);
+			IDSetSwitch(&ufSP, "Not connected");
+			return;
+		}
+
+		for(int ii=0; ii<n; ii++)
+		{
+			if(states[ii] == ISS_ON );
+			{
+				int wc = sscanf(names[ii], "%*C%*C%i%*C", &fnum);
+				if(wc == 4)
+				{
+					
+					IDMessage(mydev, "Could not match filter %s", names[ii] );
+
+				}
+				else
+				{
+
+					IDMessage(mydev, "Match for %i", fnum );
+					stageGoTo( RS485_FD, ufwNPR.name, fnum );
+				}
+
+			}
+		}
+	}
+
 	else
 	{// This is the motor specific engineering tools
 		for ( INDIMOTOR *imotor=indi_motors; imotor!=indi_motors+7; imotor++ )
@@ -1024,17 +1118,15 @@ static int guiderTelem(int init_struct)
 			{
 				for(int sbit=0; sbit<16; sbit++)
 				{	
-					//IDMessage(mydev, "MOTOR 2 your up, checking bit %i %i %i",sbit, motor->words[0] & (1<<sbit), motor->words[0] );
 					if(motor->words[0] & (1<<sbit))
 					{
-						//IDMessage(mydev, "%s %s %i bit is %s", statusLightVP->name, motor->name, motor->words[0], statusLight[sbit].name);
 						w0_statusLight[sbit].s = IPS_ALERT;
 					}
 					else
 					{
 						w0_statusLight[sbit].s = IPS_IDLE;
 					}
-					if(motor->words[0] & (1<<sbit))
+					if(motor->words[1] & (1<<sbit))
 					{
 						w1_statusLight[sbit].s = IPS_ALERT;
 					}
@@ -1071,7 +1163,6 @@ static int guiderTelem(int init_struct)
 		}
 
 		//snprintf(mname, 30, "M%i", motor->motor_num);
-
 		
 		iter++;
 		IDSetNumber(pNVP, NULL);
@@ -1237,7 +1328,6 @@ static void fillMotors()
 	for(INDIMOTOR *imotor=indi_motors; imotor!=indi_motors+7; imotor++)
 	{
 
-		
 		snprintf( group, 20, "Motor %i Eng", motor_num );
 		
 		snprintf( name, 20, "M%iIO", motor_num );
@@ -1251,7 +1341,6 @@ static void fillMotors()
 		IUFillSwitch(imotor->engSwitchesS+1, name, "Home", IPS_IDLE);
 		IDDefSwitch(&imotor->engSwitchesSP, NULL);
 
-		//Name of the motor
 		snprintf( name, 20, "M%iName", motor_num );
 		IUFillTextVector(&imotor->nameTP, imotor->nameT, NARRAY(imotor->nameT), mydev, name, "Motor Name", group, IP_RO, 0, IPS_IDLE);
 
@@ -1259,8 +1348,8 @@ static void fillMotors()
 
 		imotor->nameT[0].text = imotor->nameString;
 		IDDefText(&imotor->nameTP, NULL);
+		
 
-		//Motor status words
 		snprintf( label, 20, "Motor %i Word 0", motor_num );
 		snprintf( name, 20, "M%iW0", motor_num );
 		IUFillLightVector(&imotor->word0LP, imotor->word0L, NARRAY(imotor->word0L), mydev, (const char *) name, (const char *) label, group, IPS_IDLE );
