@@ -87,8 +87,12 @@
 #define HEAD_NODE_SETUP_DONE gg
 
 #define FILTER_DIST hh ' Number of counts between filters 
-#define UMIRROR_POS ii ' Position of the Umirror
-#define CENTER_POS jj ' Postion of the center field mirror
+
+
+#define NEG_SLIMIT_RT Bms
+#define POS_SLIMIT_RT Bps
+#define NEG_SLIMIT_HIST Bls
+#define POS_SLIMIT_HIST Brs
 
 #define FILTER_NUMBER f
 #define HOME_OFFSET kk
@@ -109,6 +113,11 @@
 
 #define OTHER_FWHEEL vv
 #define IS_MAIN_FWHEEL ww
+
+#define UMIRROR_POS xx
+#define CENTER_FIELD_POS yy
+#define CALIB_POS zz
+
 BAUD115200
 ECHO_OFF
 DEBUG = 1
@@ -248,12 +257,26 @@ C103 ' Home assuming the home sensor is only active at the index (edge detection
 		IF eee == 1
 			SLD 'Disable software limits
 		ENDIF
-		
 		TURN_ON_HOMING_IRLED
 		WAIT=100
+		IF HOME_SENSOR == HOME_ACTIVE_STATE ' We are in the home state go to the limit
+			MV
+			VT=HOME_DIRECTION*MAXV/4
+			G TWAIT
+			IF eee SLE ENDIF ' let C110 know about slimits
+			WAIT=100
+			GOSUB110
+			PRT=-HOME_DIRECTION*20000
+			G TWAIT
+		ENDIF
+
+		
 		MV
 		VT=HOME_DIRECTION*MAXV/4
 		G
+
+		
+		
 		
 		IF DEBUG == 1 PRINT("HEADING TO HOME", #13) ENDIF
 		WHILE 1 
@@ -265,11 +288,12 @@ C103 ' Home assuming the home sensor is only active at the index (edge detection
 				BREAK
 			
 			ELSEIF NEG_LIMIT_RT ' oops we hit a limit
+				IF DEBUG == 1 PRINT("Hit limit first moving back", #13) ENDIF
 				GOSUB(110) ' move out of the limit
 				MP
 				PRT=20000
 				G TWAIT ' Move passed the home sensor 
-				IF DEBUG == 1 PRINT("Hit limit first moving back", #13) ENDIF
+				
 				MV
 				VT=HOME_DIRECTION*MAXV/4 ' start again
 				G
@@ -327,25 +351,30 @@ C102 ' Home assuming the home sensor is only active at the index (edge detection
 
 	IF DEBUG == 1 PRINT("FILTER HOME CALLED", #13) ENDIF 
 	IF READY == 1 ' We don't home if the motor isn't ready.
-		
+		AT=ACCEL
 		IF DEBUG == 1 PRINT("HOMING MOTOR", #13) ENDIF
 		
 		TURN_ON_HOMING_IRLED
 
 		IF IS_MAIN_FWHEEL
+			GOSUB(499):FWHEEL_LOWER 
+			GOSUB(499):FWHEEL_UPPER
+			
 			RETRACT_SOLENOID
 		ENDIF	
 
 		MV
 		VT=MAXV/2
 		G
-	
+		DUMMYVAR1=10
 		WHILE 1 
 		' Wait till homing sensor state changes
 		' and record position of home sensor
-			IF IS_MAIN_FWHEEL 
-				GOSUB(499):FWHEEL_LOWER 
-				GOSUB(499):FWHEEL_UPPER 
+			IF IS_MAIN_FWHEEL
+				
+				'GOSUB(499):FWHEEL_LOWER 
+				'GOSUB(499):FWHEEL_UPPER
+				IF DEBUG PRINT("CHECKING FWHEELS", #13) ENDIF
 			ENDIF
 			IF HOME_SENSOR == HOME_ACTIVE_STATE
 				'IF DEBUG == 1 PRINT("HOME SENSOR TRIPPED", #13) ENDIF
@@ -369,14 +398,16 @@ C102 ' Home assuming the home sensor is only active at the index (edge detection
 
 		O=0 ' Set origin at the home sensor position
 		SET_HOMED_BIT
-		IF IS_MAIN_FWHEEL GOSUB498 ENDIF
-		OFF
-
+		IF IS_MAIN_FWHEEL 
+			GOSUB498
+		ELSE
+			OFF
+		ENDIF
 		
 		
 		TURN_OFF_HOMING_IRLED
 		VT=MAXV
-		'OFF 'we will uncomment this when the solenoid is put in place
+		
 		IF DEBUG == 1 PRINT("MOTOR HOMED", #13) ENDIF
 	ELSE
 		IF DEBUG == 1 PRINT("MOTOR NOT READY") ENDIF
@@ -386,6 +417,9 @@ RETURN
 
 
 C101 'HOME at the limits'
+	IF CADDR != OFFSET_FOCUS
+		END
+	ENDIF
 	SLD
 	MV
 	VT=MAXV/4
@@ -487,7 +521,41 @@ C110 'Get out of limit
 	'Algorithm:
 	' 1. If in neg limit, move positive 5000 counts
 	' 2. If in pos limit, move negative 5000 counts
+	
+	SWITCH CADDR ' Bail if I am the wrong motor
+	CASE OFFSET_FWHEEL
+		END
+	BREAK
+	CASE FWHEEL_UPPER
+		END
+	BREAK
+	CASE FWHEEL_LOWER
+		END
+	BREAK
+	ENDS
+
 	IF DEBUG PRINT("MOVING OUT OF LIMIT", #13) ENDIF
+	eee=0
+	IF SLIMITS_ENABLED
+		eee=1
+		IF DEBUG PRINT("CHECKING SOFT LIMIT", #13) ENDIF
+		SLD
+		IF NEG_SLIMIT_HIST == 1
+			IF DEBUG == 1 PRINT("NEG SLIMIT", #13) ENDIF
+			Zls	'reset limit
+			WAIT=100
+			PRT=5000
+			G TWAIT
+		ELSEIF POS_SLIMIT_HIST == 1
+			IF DEBUG == 1 PRINT("POS SLIMIT", #13) ENDIF
+			Zrs ' reset limit
+			WAIT=100
+			PRT=-5000
+			G TWAIT
+		ENDIF
+	
+	ENDIF
+	
 	MP
 	IF NEG_LIMIT_RT == 1
 		IF DEBUG == 1 PRINT("NEG LIMIT", #13) ENDIF
@@ -501,8 +569,12 @@ C110 'Get out of limit
 		G TWAIT
 	ENDIF
 	
-
+	IF eee
+		SLE
+	ENDIF
+	OFF
 RETURN 
+
 		
 	
 C120 'Set the software limits
@@ -516,6 +588,18 @@ C120 'Set the software limits
 	' 7. Move out of the limit
 	' 8. Enable the software limits
 
+	SWITCH CADDR ' Bail if I am the wrong motor
+	CASE OFFSET_FWHEEL
+		END
+	BREAK
+	CASE FWHEEL_UPPER
+		END
+	BREAK
+	CASE FWHEEL_LOWER
+		END
+	BREAK
+	ENDS
+
 	IF READY == 1
 		IF GET_HOMED_BIT == 1
 			SLD
@@ -524,7 +608,7 @@ C120 'Set the software limits
 			G
 			
 			WHILE POS_LIMIT_RT == 0 LOOP
-			SLP=PA-500
+			SLP=PA-2000
 			POS_SLIMIT = SLP
 			EPTR = EEP_SOFTWARE_LIMIT+4
 			VST(POS_SLIMIT, 1)
@@ -537,7 +621,7 @@ C120 'Set the software limits
 			G
 			
 			WHILE NEG_LIMIT_RT == 0 LOOP
-			SLN = PA+500
+			SLN = PA+2000
 			NEG_SLIMIT = SLN
 
 			EPTR = EEP_SOFTWARE_LIMIT
@@ -589,7 +673,6 @@ C105 ' Home sub assuming the home switch is active half of the travel.
 RETURN 
 
 
-
 C0  ' Startup stuff the head node motor
 	' This code only runs on the head node
 	' It writes the trajectory constants 
@@ -625,7 +708,6 @@ C0  ' Startup stuff the head node motor
 		SET_NODE_READY:OFFSET_X
 		US(OFFSET_X)
 	ENDIF
-	
 
 	Zs
 	MAXV:OFFSET_Y = 300000
@@ -662,11 +744,12 @@ C0  ' Startup stuff the head node motor
 	MAXV:OFFSET_MIRRORS = 300000
 	ACCEL:OFFSET_MIRRORS = 500
 	DECEL:OFFSET_MIRRORS = 500
-	UMIRROR_POS:OFFSET_MIRRORS = 30000
-	CENTER_POS:OFFSET_MIRRORS = 0
 	HOME_INACTIVE_STATE:OFFSET_MIRRORS = 0
 	HOME_ACTIVE_STATE:OFFSET_MIRRORS = 0
 	HOME_DIRECTION:OFFSET_MIRRORS = -1
+	UMIRROR_POS:OFFSET_MIRRORS = 5600
+	CENTER_FIELD_POS:OFFSET_MIRRORS = 335800
+	CALIB_POS:OFFSET_MIRRORS = 0
 	WAIT=100
 	IF Bs == 1
 		IF DEBUG == 1 PRINT("U-Mirror Stage not accessible on CAN", #13 ) ENDIF
@@ -749,31 +832,85 @@ C400 ' go to filter
 		BREAK
 	ENDS
 	MP
+	AT=ACCEL
 	IF f >= 0
 		IF f < 5
 			PT = f * FILTER_DIST
-			
-			IF CADDR != OFFSET_FWHEEL
+			IF IS_MAIN_FWHEEL ' Deal with the solenoid
+				GOSUB(499):FWHEEL_LOWER
+				GOSUB(499):FWHEEL_UPPER
 				RETRACT_SOLENOID
 			ENDIF
-			
 			G 
 			WHILE ISMOVING
 			
 				IF IS_MAIN_FWHEEL 
-					GOSUB(499):FWHEEL_LOWER
-					GOSUB(499):FWHEEL_UPPER
+					'GOSUB(499):FWHEEL_LOWER
+					'GOSUB(499):FWHEEL_UPPER
 				ENDIF
-			LOOP
-			
+			LOOP		
 			IF FILTER_SENSOR == 0
 				IF DEBUG PRINT("WE are on the filter!", #13) ENDIF
 			ENDIF
 			'TURN_OFF_HOMING_IRLED
-			IF IS_MAIN_FWHEEL GOSUB(498) ENDIF
-			OFF
+			IF IS_MAIN_FWHEEL 
+				GOSUB(498)
+			ELSE
+				OFF
+			ENDIF
+			
 		ENDIF
 	ENDIF
+RETURN
+
+C500 'Linear stage go to
+	SWITCH CADDR ' Bail if this isn't a linear stage wheel
+		CASE FWHEEL_LOWER
+			END
+		BREAK
+		CASE FWHEEL_UPPER
+			END
+		BREAK
+		CASE OFFSET_FWHEEL
+			END
+		BREAK
+	ENDS
+	IF READY == 0
+		IF DEBUG PRINT("MOTOR NOT READY", #13) ENDIF
+	ENDIF
+	G TWAIT 
+	OFF
+RETURN
+
+C501 ' UMIRROR goto
+	IF CADDR != OFFSET_MIRRORS
+		END
+	ENDIF
+	MP
+	PT=UMIRROR_POS
+	G TWAIT
+	OFF
+	
+RETURN
+
+C502 ' Centerfield GOTO
+	IF CADDR != OFFSET_MIRRORS
+		END
+	ENDIF
+	MP
+	PT=CENTER_FIELD_POS
+	G TWAIT
+	OFF	
+RETURN
+
+C503 ' Calib GOTO
+	IF CADDR != OFFSET_MIRRORS
+		END
+	ENDIF
+	MP
+	PT=CALIB_POS
+	G TWAIT
+	OFF	
 RETURN
 
 C1 ' All nodes startup
@@ -829,8 +966,6 @@ C55 ' Clear the command error
 RETURN	
 
 
-
-
 C50 ' Attempt to find spare
 RETURN
 
@@ -851,12 +986,19 @@ C411 ' Release the solenoid
 	IF CADDR != FWHEEL_UPPER
 		END
 	ENDIF
+	WAIT=1000
 	OR(9)
 	OS(7) OS(8)
 	WAIT=100
 	WHILE IN(6) == 1
 		WAIT=100
 	LOOP
+	OFF:FWHEEL_UPPER OFF:FWHEEL_LOWER
+	' Set the acceleration to 0 in for safety.
+	' Acceleration is turned back on when home(GOSUB102)
+	' or when we move filter wheels (GOSUB400)
+	AT:FWHEEL_UPPER=0
+	AT:FWHEEL_LOWER=0
 	IF DEBUG PRINT("SOLENOID RELEASED", #13) ENDIF
 	
 RETURN
@@ -868,10 +1010,11 @@ C498
 	ENDIF
 
 	WHILE ISMOVING:OTHER_FWHEEL
-		
+		WAIT=100
 	LOOP
 	IF DEBUG PRINT("BOTH FWHEELS STOPPED", #13) ENDIF
-	OFF:FWHEEL_UPPER OFF:FWHEEL_LOWER
+	
+
 	RELEASE_SOLENOID
 	
 RETURN
@@ -891,10 +1034,10 @@ C499 ' Watch the main filter wheels
 	ELSE
 		'IF DEBUG PRINT("HOOOOOOOOOLD", #13) ENDIF
 		IF GET_HOMED_BIT
-			PT=f*FILTER_DIST 'Hold position
+			PT=f*FILTER_DIST 'Hold position  at filter
 			G
 		ELSE
-			PT=PA
+			PT=PA ' Hold position where ever you are.
 			G
 		ENDIF
 	ENDIF
