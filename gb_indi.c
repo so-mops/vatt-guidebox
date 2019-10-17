@@ -173,8 +173,11 @@ static IText head_nodeT[] = {{"HEAD", "Head Motor Node", "IDK?", 0, 0, 0}};
 static char head_nodeString[20];
 static ITextVectorProperty head_nodeTP = { mydev, "HEAD", "Head Motor Node", ENG_GROUP , IP_RO, 0, IPS_IDLE,  head_nodeT, NARRAY(head_nodeT), "", 0};
 
+
+
+//Filter wheel buttons
 static ISwitch lfS[]  = {
-	{"LF0S",  "",  ISS_OFF, 0, 0},
+	{"LF0S",  "Clear",  ISS_OFF, 0, 0},
 	{"LF1S",  "",  ISS_OFF, 0, 0},
 	{"LF2S",  "",  ISS_OFF, 0, 0},
 	{"LF3S",  "",  ISS_OFF, 0, 0},
@@ -184,7 +187,7 @@ static ISwitch lfS[]  = {
 ISwitchVectorProperty lfSP      = { mydev, "LFS", "Lower Wheel",  MAIN_GROUP, IP_RW, ISR_1OFMANY, 0, IPS_IDLE,  lfS, NARRAY(lfS), "", 0 };
 
 static ISwitch ufS[]  = {
-	{"UF0S",  "",  ISS_OFF, 0, 0},
+	{"UF0S",  "Clear",  ISS_OFF, 0, 0},
 	{"UF1S",  "",  ISS_OFF, 0, 0},
 	{"UF2S",  "",  ISS_OFF, 0, 0},
 	{"UF3S",  "",  ISS_OFF, 0, 0},
@@ -192,6 +195,27 @@ static ISwitch ufS[]  = {
 	};
 
 ISwitchVectorProperty ufSP      = { mydev, "UFS", "Upper Wheel",  MAIN_GROUP, IP_RW, ISR_1OFMANY, 0, IPS_IDLE,  ufS, NARRAY(ufS), "", 0 };
+
+
+static ISwitch gfS[]  = {
+	{"GF0S",  "Clear",  ISS_OFF, 0, 0},
+	{"GF1S",  "Bl+ND",  ISS_OFF, 0, 0},
+	{"GF2S",  "Blue",  ISS_OFF, 0, 0},
+	{"GF3S",  "Rd+ND",  ISS_OFF, 0, 0},
+	{"GF4S",  "Red",  ISS_OFF, 0, 0},
+	};
+
+ISwitchVectorProperty gfSP      = { mydev, "GFS", "Upper Wheel",  MAIN_GROUP, IP_RW, ISR_1OFMANY, 0, IPS_IDLE,  gfS, NARRAY(gfS), "", 0 };
+
+
+//Umirror/Centerfield position
+static ISwitch mirr_posS[]  = {
+	{"CENTER",  "Center",  ISS_OFF, 0, 0},
+	{"UMIRROR",  "U-Mirror",  ISS_OFF, 0, 0},
+	{"CALIB",  "Calib.",  ISS_OFF, 0, 0},
+	};
+
+ISwitchVectorProperty mirr_posSP      = { mydev, "MIRRORS", "Mirror",  MAIN_GROUP, IP_RW, ISR_1OFMANY, 0, IPS_IDLE,  mirr_posS, NARRAY(mirr_posS), "", 0 };
 
 
 // User given names for filters in lower filter wheel
@@ -318,6 +342,10 @@ char rawCmdString[50];
 
 		IDDefSwitch(&lfSP, NULL);
 		IDDefSwitch(&ufSP, NULL);
+		IDDefSwitch(&gfSP, NULL);
+
+
+		IDDefSwitch(&mirr_posSP, NULL);
 
 		IDDefText(&head_nodeTP, NULL);
 		head_nodeT[0].text = head_nodeString;
@@ -327,7 +355,7 @@ char rawCmdString[50];
 
 		//TODO this should be read from a config file.
 		strcpy(ttyPortTP.tp[0].text, "/dev/ttyUSB0");
-		strcpy(networkTP.tp[0].text, "10.130.133.24:10001");
+		strcpy(networkTP.tp[0].text, "10.0.3.15:10001");
 		gcomtype = NET;
 		/*
 		
@@ -832,6 +860,37 @@ int fnum;
 		}
 	}
 
+	else if( !strcmp(name, gfSP.name) )
+	{	
+		
+		if(connectS[0].s == ISS_OFF)
+		{
+			IUResetSwitch(&gfSP);
+			IDSetSwitch(&gfSP, "Not connected");
+			return;
+		}
+
+		for(int ii=0; ii<n; ii++)
+		{
+			if(states[ii] == ISS_ON );
+			{
+				int wc = sscanf(names[ii], "%*C%*C%i%*C", &fnum);
+				if(wc == 4)
+				{
+					
+					IDMessage(mydev, "Could not match filter %s", names[ii] );
+
+				}
+				else
+				{
+
+					IDMessage(mydev, "Match for %i", fnum );
+					stageGoTo( RS485_FD, ofwNPR.name, fnum );
+				}
+
+			}
+		}
+	}
 	else
 	{// This is the motor specific engineering tools
 		for ( INDIMOTOR *imotor=indi_motors; imotor!=indi_motors+7; imotor++ )
