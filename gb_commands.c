@@ -77,7 +77,7 @@ char input[50], *address, *portstr;
 		if (port==0)
 			port=10001;
 		}
-	printf("opening add:%s  port%i\n", address, port);
+	fprintf(stderr, "opening add:%s  port%i\n", address, port);
 	netfd = open_port_net( address, port );
 	return netfd; 
     
