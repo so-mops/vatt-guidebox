@@ -92,7 +92,7 @@ static ISwitch resetLtxS[] = {{"RESET_LTX",  "Reset Lantronix",  ISS_OFF, 0, 0},
 static ISwitchVectorProperty resetLtxSP = { mydev, "lTXRESET", "Lantronix",  ENG_GROUP, IP_RW, ISR_NOFMANY, 0, IPS_IDLE,  resetLtxS, NARRAY(resetLtxS), "", 0 };
 
 
-static IText networkT[] =  {{"NETWORK", "Net", "10.130.133.24:10001", 0, 0, 0}};
+static IText networkT[] =  {{"NETWORK", "Net", "10.0.3.15:10001", 0, 0, 0}};
 static ITextVectorProperty networkTP = {  mydev, "NET", "Guider Network Information",  ENG_GROUP , IP_RW, 0, IPS_IDLE,  networkT, NARRAY(networkT), "", 0};
 
 static IText ttyPortT[] =  {{"TTYport", "TTY Port", "/dev/ttyUSB0", 0, 0, 0}};
@@ -707,7 +707,7 @@ int fnum;
 				//sp->s = states[0];
 				connectS[0].s = ISS_ON;
 				//connectS[1].s = ISS_OFF;
-				//IDMessage(mydev, "networkT[0].text=%s", networkT[0].text);
+				IDMessage(mydev, "networkT[0].text=%s", networkT[0].text);
 				if (gcomtype == NET)
 					RS485_FD = net_ttyOpen(networkT[0].text);
 				else
@@ -1131,6 +1131,7 @@ static int guiderTelem(int init_struct)
 		//The rest of the stuff is for engineering purposes
 		
 		pNVP = motor2nvp(motor);
+		IDMessage(mydev, "%s %i %i %i", motor->name, motor->words[0], motor->words[1], motor->userbits);
 		if(pNVP == NULL)
 		{//stuct did not init properly.
 			IDMessage(mydev, "%i Motor %s (Num %i) was not intialized correctly in the allmotors array. This indicates a communication failure.", iter, motor->name, motor->motor_num);
