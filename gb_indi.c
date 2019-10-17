@@ -48,11 +48,20 @@
 #define MOT7_GROUP "MOTOR 7 Eng"
 
 #define ENCODER2MM (1.0/2000.0)
+#define XOFFSET 103.1
+#define YOFFSET 46.5
+#define YOFFSET_UMIRROR 58.25
 
 #define POLLMS          500                             /* poll period, ms */
 
 #define NET 0
 #define SER 1
+
+typedef enum{
+	XTRANS,
+	YTRANS,
+	FOCUSTRANS
+} TRANS;
 
 int RS485_FD;
 int inited;
@@ -64,6 +73,8 @@ void guiderProc (void *p);
 static void buildMStatusString(MSTATUS *, char *);
 static void fillMotors();
 static void fillFWheels();
+static int saveFNames(char *, char *, char *);
+static int loadFNames(char *, char[5][20]);
 
 //global memory for IText properties
 char gttyPORT[20];
@@ -205,7 +216,7 @@ static ISwitch gfS[]  = {
 	{"GF4S",  "Red",  ISS_OFF, 0, 0},
 	};
 
-ISwitchVectorProperty gfSP      = { mydev, "GFS", "Upper Wheel",  MAIN_GROUP, IP_RW, ISR_1OFMANY, 0, IPS_IDLE,  gfS, NARRAY(gfS), "", 0 };
+ISwitchVectorProperty gfSP      = { mydev, "GFS", "Guider Wheel",  MAIN_GROUP, IP_RW, ISR_1OFMANY, 0, IPS_IDLE,  gfS, NARRAY(gfS), "", 0 };
 
 
 //Umirror/Centerfield position
@@ -234,7 +245,7 @@ static ITextVectorProperty lfnTP = { mydev, "LOWER_FNAMES", "Lower Filter Wheel 
 
 // User given names for filters in upper filter wheel
 static IText ufnT[] = {
-	{"F0", "Filter 0", "SHIT", 0, 0, 0},
+	{"F0", "Filter 0", "", 0, 0, 0},
 	{"F1", "Filter 1", "", 0, 0, 0},
 	{"F2", "Filter 2", "", 0, 0, 0},
 	{"F3", "Filter 3", "", 0, 0, 0},
@@ -320,6 +331,7 @@ char rawCmdString[50];
 #############################################################################*/
  void ISGetProperties (const char *dev)
  {
+		char filter_names[5][20];
 		if (dev && strcmp (mydev, dev))
 			return;
  
@@ -339,7 +351,7 @@ char rawCmdString[50];
 
 		IDDefText(&rawCmdTP, NULL);
 		rawCmdT[0].text = rawCmdString;
-
+		
 		IDDefSwitch(&lfSP, NULL);
 		IDDefSwitch(&ufSP, NULL);
 		IDDefSwitch(&gfSP, NULL);
@@ -458,10 +470,10 @@ char rawCmdString[50];
 		for(int jj=0; jj<n; jj++)
 		{
 			strcpy( lfnT[jj].text, texts[jj] );
-			strcpy(lfS[jj].label, texts[jj]);
+			if( strcmp(texts[jj], "") != 0 )
+				saveFNames(lfnTP.name, texts[jj], ufnT[jj].name );
 		}
 		IDSetText(&lfnTP, NULL );
-		IDDefSwitch(&lfSP, "UPDATING SWITCH" );
 		
 	}	
 	
@@ -472,6 +484,8 @@ char rawCmdString[50];
 		for(int jj=0; jj<n; jj++)
 		{
 			strcpy( ufnT[jj].text, texts[jj] );
+			if( strcmp(texts[jj], "") != 0 )
+				saveFNames(ufnTP.name, texts[jj], ufnT[jj].name );
 		}
 		IDSetText(&ufnTP, NULL );
 	}
@@ -1221,9 +1235,45 @@ static int guiderTelem(int init_struct)
 			}
 
 		}
+		//motor specific things
+		if( !strcmp( motor->name, "LOWER_FWHEEL" ) )
+		{
+			if( motor->isMoving )
+			{
+				lfSP.s = IPS_BUSY;	
+			}
+			else
+			{
+				lfSP.s = IPS_OK;	
+			}
+			IDSetSwitch(&lfSP, NULL);
+		}
 
-		//snprintf(mname, 30, "M%i", motor->motor_num);
-		
+		else if( !strcmp( motor->name, "UPPER_FWHEEL" ) )
+		{
+			if( motor->isMoving )
+			{
+				ufSP.s = IPS_BUSY;	
+			}
+			else
+			{
+				ufSP.s = IPS_OK;	
+			}
+			IDSetSwitch(&ufSP, NULL);
+		}
+		else if( !strcmp( motor->name, "GUIDER_FWHEEL" ) )
+		{
+			if( motor->isMoving )
+			{
+				gfSP.s = IPS_BUSY;	
+			}
+			else
+			{
+				gfSP.s = IPS_OK;	
+			}
+			IDSetSwitch(&gfSP, NULL);
+		}
+
 		iter++;
 		IDSetNumber(pNVP, NULL);
 	}
@@ -1491,3 +1541,106 @@ static void fillFWheels()
 			IDDefText(&gfnTP, NULL);
 		}
 }
+
+
+
+
+/*
+TODO:
+The following two functions are a means of 
+saving the filter names to a file so that 
+they can be retrieved when the driver is restarted.
+These function rely on scanf and assume a whitespace
+separated functions. Unfortunately, there is nothing 
+to keep the user from using whitespace in the name
+of the filters. I would instead opt for comma separated
+values or use some other delimiter. Alas, I am running 
+out of time and I have other things to do. Maybe on 
+the next iteration
+
+Scott Swindell 10/2019
+*/
+static int saveFNames(char *wheel, char *name, char *fnum)
+{
+	char saved_filters[200];
+	char filters[5][20];
+	int wc, num;
+	FILE *fid;
+	sscanf(fnum, "%*c%i", &num );
+	IDMessage(mydev, "%s %i %s", fnum, num, name);
+		
+	strcpy(filters[0], "Clear");
+	if( access( wheel, F_OK ) != 1 )
+		fid = fopen(wheel, "r");
+	else	
+	{
+		fid = NULL;
+		IDMessage(mydev, "fid is null fo sure");
+	}
+
+	
+	if(fid)
+	{
+		
+		wc = fscanf(fid, "%s %s %s %s %s", filters[0], filters[1], filters[2], filters[3], filters[4] );
+		fclose(fid);
+		fid = fopen(wheel, "w");//clear the file
+		if(wc == 5)
+		{
+			strcpy( filters[num], name );
+			fprintf(fid, "%s %s %s %s %s", filters[0], filters[1], filters[2], filters[3], filters[4]);
+		}
+		else
+		{// oops corrupted file
+			for(int ii=0; ii<5; ii++)
+			{
+				strcpy( filters[ii], "????" );
+				
+			}
+			
+			strcpy( filters[num], name );
+			fprintf(fid, "%s %s %s %s %s", filters[0], filters[1], filters[2], filters[3], filters[4]);
+		}	
+	}
+	else
+	{//No wheel file... let's make one
+		fid = fopen(wheel, "w");
+		for(int ii=0; ii<5; ii++)
+		{
+			strcpy( filters[ii], "????" );	
+		}
+		strcpy( filters[num], name);
+		fprintf( fid, "%s %s %s %s %s", filters[0], filters[1], filters[2], filters[3], filters[4]);
+	}
+	
+	fclose(fid);
+}
+
+static int loadFNames(char * wheel, char filters[5][20])
+{
+	FILE *fid;
+	if( access( wheel, F_OK ) != 1 )
+		fid = fopen(wheel, "r");
+	else	
+	{
+		fid = NULL;
+	}
+	
+	if(fid)
+	{
+		int wc = fscanf(fid, "%s %s %s %s %s", filters[0], filters[1], filters[2], filters[3], filters[4]);
+	}
+	else
+	{
+		for(int ii=1; ii<4; ii++)
+		{
+			strcpy(filters[ii], "??????");
+		}
+	}
+	strcpy(filters[0], "Clear");//first one is always clear
+	for(int ii=0; ii<5; ii++)
+	{
+		fprintf(stderr, "%i %s %s \n", ii, wheel, filters[ii]);
+	}
+}
+
