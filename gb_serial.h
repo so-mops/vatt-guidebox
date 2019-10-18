@@ -52,5 +52,5 @@ int moog_callsub( int rs485_fd, int subnum, int can_addr );
 void print_status(MSTATUS stat);
 int build_stat_structs( int rs485_fd, MSTATUS motors[] );
 void gb_lantronix_reset(char *host, short port);
-
+void moog_serialfix(int rs485_fd);
 
