@@ -54,7 +54,7 @@
 #define YOFFSET 46.5
 #define YOFFSET_UMIRROR 58.25
 
-#define POLLMS          500                             /* poll period, ms */
+#define POLLMS          1000                             /* poll period, ms */
 
 #define NET 0
 #define SER 1
@@ -104,8 +104,12 @@ static ISwitchVectorProperty comTypeSP = { mydev, "COMTYPE", "Connection Type", 
 static ISwitch resetLtxS[] = {{"RESET_LTX",  "Reset Lantronix",  ISS_OFF, 0, 0},};
 static ISwitchVectorProperty resetLtxSP = { mydev, "lTXRESET", "Lantronix",  ENG_GROUP, IP_RW, ISR_NOFMANY, 0, IPS_IDLE,  resetLtxS, NARRAY(resetLtxS), "", 0 };
 
+static ISwitch serialfixS[] = {{"FIXSERIAL",  "Fix Serial Line",  ISS_OFF, 0, 0},};
+static ISwitchVectorProperty serialfixSP = { mydev, "SFIX", "FIX",  ENG_GROUP, IP_RW, ISR_NOFMANY, 0, IPS_IDLE,  serialfixS, NARRAY(serialfixS), "", 0 };
 
-static IText networkT[] =  {{"NETWORK", "Net", "10.0.3.15:10001", 0, 0, 0}};
+
+
+static IText networkT[] =  {{"NETWORK", "Net", "10.0.3.86:10001", 0, 0, 0}};
 static ITextVectorProperty networkTP = {  mydev, "NET", "Guider Network Information",  ENG_GROUP , IP_RW, 0, IPS_IDLE,  networkT, NARRAY(networkT), "", 0};
 
 static IText ttyPortT[] =  {{"TTYport", "TTY Port", "/dev/ttyUSB0", 0, 0, 0}};
@@ -358,7 +362,7 @@ char rawCmdString[50];
 		IDDefSwitch(&ufSP, NULL);
 		IDDefSwitch(&gfSP, NULL);
 
-
+		IDDefSwitch(&serialfixSP, NULL);
 		IDDefSwitch(&mirr_posSP, NULL);
 
 		IDDefText(&head_nodeTP, NULL);
@@ -369,7 +373,7 @@ char rawCmdString[50];
 
 		//TODO this should be read from a config file.
 		strcpy(ttyPortTP.tp[0].text, "/dev/ttyUSB0");
-		strcpy(networkTP.tp[0].text, "10.0.3.15:10001");
+		strcpy(networkTP.tp[0].text, "10.0.3.86:10001");
 		gcomtype = NET;
 		/*
 		
@@ -567,7 +571,7 @@ char rawCmdString[50];
                  return;
              }
              //TODO check which mirros is in.
-             stageGoTo(RS485_FD, offyNPR.name, (int)(values[0]+YOFFSET/ENCODER2MM));
+             stageGoTo(RS485_FD, offyNPR.name, (int)((values[0]+YOFFSET)/ENCODER2MM));
 	
 	     offyNPR.s = IPS_IDLE;
 	     IDSetNumber(&offyNPR, NULL);
@@ -907,6 +911,43 @@ int fnum;
 			}
 		}
 	}
+	else if( !strcmp(name, mirr_posSP.name))
+	{
+		for( int ii=0; ii<n; ii++)
+		{
+			if(states[ii] == ISS_ON)
+			{
+				//TODO the 4 in the callsub fxns
+				//should not be hard coded. It is
+				//the address of the OFFSET_MIRRORS
+				//stage. Motor->num names should 
+				// come from the allmotors array
+				// or the indi counterpart.
+				if(!strcmp(names[ii], "CENTER"))
+				{	
+					moog_callsub(RS485_FD, 502, 4);
+					break;
+				}
+				else if(!strcmp(names[ii], "UMIRROR"))
+				{
+					moog_callsub(RS485_FD, 501, 4);
+					break;
+				}
+				else if(!strcmp(names[ii], "CALIB"))
+				{
+					moog_callsub(RS485_FD, 503, 4);
+					break;
+				}
+
+			}
+		}
+	}
+	else if( !strcmp(name, serialfixSP.name))
+	{
+		moog_serialfix(RS485_FD);
+		IUResetSwitch(&serialfixSP);
+		IDSetSwitch(&serialfixSP, "Sent Serial Fix");
+	}
 	else
 	{// This is the motor specific engineering tools
 		for ( INDIMOTOR *imotor=indi_motors; imotor!=indi_motors+7; imotor++ )
@@ -1068,7 +1109,7 @@ static int guiderTelem(int init_struct)
  {
         char ret[121], ret2[121], guiderResponse[300], mname[30] ;
 		
-	int  err, ix, isFilter, active;
+	int  err, ix, isFilter, active, allHomed=1;
 	double num;
 	static MSTATUS allmotors[7];
 	INumber *indinum;
@@ -1154,6 +1195,11 @@ static int guiderTelem(int init_struct)
 			//We should probably bail out and disconnect here.
 			continue;
 		}
+
+		if(!motor->isHomed)
+		{
+			allHomed=0;
+		}
 		if ( motor->isActive )
 		{/*motor->isActive tells us weather the head node was able to communicate with 
 		 motor over the can bus.*/
@@ -1180,7 +1226,7 @@ static int guiderTelem(int init_struct)
 			{
 				pNVP->s = IPS_BUSY;
 			}
-			
+				
 
 			//pNVP->np[0].value = motor->pos*ENCODER2MM;
 			w0_statusLight = indi_motors[motor->motor_num-1].word0L;
@@ -1246,7 +1292,10 @@ static int guiderTelem(int init_struct)
 			}
 			else
 			{
-				lfSP.s = IPS_OK;	
+				IUResetSwitch(&lfSP);
+				lfS[motor->fnum].s = ISS_ON;
+				lfSP.s = IPS_OK;
+					
 			}
 			IDSetSwitch(&lfSP, NULL);
 		}
@@ -1259,6 +1308,8 @@ static int guiderTelem(int init_struct)
 			}
 			else
 			{
+				IUResetSwitch(&ufSP);
+				ufS[motor->fnum].s = ISS_ON;
 				ufSP.s = IPS_OK;	
 			}
 			IDSetSwitch(&ufSP, NULL);
@@ -1271,7 +1322,9 @@ static int guiderTelem(int init_struct)
 			}
 			else
 			{
+				IUResetSwitch(&gfSP);
 				gfSP.s = IPS_OK;	
+				gfS[motor->fnum].s = ISS_ON;
 			}
 			IDSetSwitch(&gfSP, NULL);
 		}
@@ -1288,11 +1341,33 @@ static int guiderTelem(int init_struct)
 		{
 			 pNVP->np[0].value = (motor->pos*ENCODER2MM);
 		}
+		else if( !strcmp( motor->name, "OFFSET_MIRRORS" ) )
+		{
+			
+			pNVP->np[0].value = (motor->pos*ENCODER2MM);
+			if(motor->isMoving)
+			{
+				mirr_posSP.s = IPS_BUSY;
+			}
+			else
+			{
+				mirr_posSP.s = IPS_OK;
+			}
+			IDSetSwitch(&mirr_posSP, NULL);
+				
+		}
 		iter++;
 		IDSetNumber(pNVP, NULL);
 	}
-
-
+	if(allHomed)
+	{
+		actionSP.s = IPS_OK;
+	}
+	else
+	{
+		actionSP.s = IPS_BUSY;
+	}
+	IDSetSwitch(&actionSP, NULL );
 	//fprintf(stderr, "in guiderTelem %s\n", allmotors[5].name );
  	return 1;
         
