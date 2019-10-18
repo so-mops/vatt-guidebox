@@ -400,7 +400,7 @@ int moog_read( int rs485_fd, char resp[] )
 		if(select( rs485_fd+1, &set, NULL, NULL, &timeout ) == 1)
 		{
 			rn = read(rs485_fd, resp+ii, 1);
-			//printf("%i %c\n", ii, resp[ii]);
+			//fprintf(stderr, "%i %c\n", ii, resp[ii]);
 			if(resp[ii] == '\r' || resp[ii] == '\n')
 			{
 				resp[ii+1] = '\0';
@@ -728,9 +728,6 @@ int moog_getallstatus(int rs485_fd, MSTATUS stat[])
  *
  *
  *
- *
- *
- *
  * *****************************************************/
 int moog_getallstatus_quick(int rs485_fd, MSTATUS motors[])
 {
@@ -738,6 +735,8 @@ int moog_getallstatus_quick(int rs485_fd, MSTATUS motors[])
 	int read_status=0;
 	int motor_num=0, pos, f, w0, w1, w2, w3, userbits, iobits;
 	int wc, active;
+	static int foo = 0;
+	int motor_count=0;
 	moog_read(rs485_fd, resp);//Flush the line
 
 	/* Something is causing the motors to not respond
@@ -749,17 +748,23 @@ int moog_getallstatus_quick(int rs485_fd, MSTATUS motors[])
 	 * find the cause of the motors not responding. 
 	 * --Scott 10/2019
 	 * */
-	moog_serialfix(rs485_fd);
-	usleep(1000);
 	moog_callsub( rs485_fd, 998, -1);
 	while(motor_num <7 )
 	{
 		moog_read(rs485_fd, resp);
 		wc = sscanf(resp, "%i %i %i %i %i %i %i %i %i", &motor_num, &pos, &f, &w0, &w1, &w2, &w3, &userbits, &iobits );
-		fprintf(stderr, "[%s]\n", resp );
+		//fprintf(stderr, "[%s]\n", resp );
 		if (wc != 9)
+		{
+			fprintf(stderr, "[%s]\n", resp );
+			moog_serialfix(rs485_fd);
 			continue;
-		fprintf(stderr, " %i %i %i %i %i %i %i %i %i\n", motor_num, pos, f, w0, w1, w2, w3, userbits, iobits );
+		}
+		else
+		{
+			fprintf(stderr, "{%s}\n", resp );
+		}
+		//fprintf(stderr, " %i %i %i %i %i %i %i %i %i\n", motor_num, pos, f, w0, w1, w2, w3, userbits, iobits );
 		for(MSTATUS *motor=motors; motor!=motors+NMOTORS; motor++)
 		{
 			if(motor_num == motor->motor_num)
@@ -778,10 +783,17 @@ int moog_getallstatus_quick(int rs485_fd, MSTATUS motors[])
 				motor->isMoving = w0 & (1<<2);
 				motor->isHomed = userbits & 1;
 				active = (1<<motor->motor_num) | active;
+				motor_count++;
 			}
 		}
 	}
-	
+
+	if(motor_count != 7)
+	{
+		
+		fprintf(stderr, "We are missing motors\n");
+	}
+	fprintf(stderr, "END getallstatus %i \n", active );
 	return active;
 }
 
