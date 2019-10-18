@@ -734,7 +734,7 @@ int moog_getallstatus(int rs485_fd, MSTATUS stat[])
  * *****************************************************/
 int moog_getallstatus_quick(int rs485_fd, MSTATUS motors[])
 {
-	char resp[READSIZE];
+	char resp[5000];
 	int read_status=0;
 	int motor_num=0, pos, f, w0, w1, w2, w3, userbits, iobits;
 	int wc, active;
@@ -754,11 +754,12 @@ int moog_getallstatus_quick(int rs485_fd, MSTATUS motors[])
 	moog_callsub( rs485_fd, 998, -1);
 	while(motor_num <7 )
 	{
-		moog_read(rs485_fd, resp) == -1;
+		moog_read(rs485_fd, resp);
 		wc = sscanf(resp, "%i %i %i %i %i %i %i %i %i", &motor_num, &pos, &f, &w0, &w1, &w2, &w3, &userbits, &iobits );
+		fprintf(stderr, "[%s]\n", resp );
 		if (wc != 9)
 			continue;
-		//fprintf(stderr, "%i %i %i %i %i %i %i %i %i\n", motor_num, pos, f, w0, w1, w2, w3, userbits, iobits );
+		fprintf(stderr, " %i %i %i %i %i %i %i %i %i\n", motor_num, pos, f, w0, w1, w2, w3, userbits, iobits );
 		for(MSTATUS *motor=motors; motor!=motors+NMOTORS; motor++)
 		{
 			if(motor_num == motor->motor_num)

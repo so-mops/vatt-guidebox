@@ -23,7 +23,7 @@
 #include <libindi/indidevapi.h>
 #include <libindi/eventloop.h>
 #include <libindi/indicom.h>
-
+#include <math.h>
 
 
 /* header for this project */
@@ -47,6 +47,8 @@
 #define MOT6_GROUP "MOTOR 6 Eng"
 #define MOT7_GROUP "MOTOR 7 Eng"
 
+
+//TODO these should be in a config file
 #define ENCODER2MM (1.0/2000.0)
 #define XOFFSET 103.1
 #define YOFFSET 46.5
@@ -533,7 +535,7 @@ char rawCmdString[50];
                  IDSetNumber(&offFocNPR, "Guider is offline.");
                  return;
              }
-             stageGoTo(RS485_FD, offFocNPR.name, (int)values[0]/ENCODER2MM);
+             stageGoTo(RS485_FD, offFocNPR.name, (int)(values[0]/ENCODER2MM));
 	
 	     offFocNPR.s = IPS_IDLE;
 	     IDSetNumber(&offFocNPR, NULL);
@@ -549,7 +551,7 @@ char rawCmdString[50];
                  return;
              }
              
-             stageGoTo(RS485_FD, offxNPR.name, (int)(values[0]/ENCODER2MM));
+             stageGoTo(RS485_FD, offxNPR.name, (int)((values[0]+XOFFSET)/ENCODER2MM));
 	
 	     offxNPR.s = IPS_IDLE;
 	     IDSetNumber(&offxNPR, NULL);
@@ -564,8 +566,8 @@ char rawCmdString[50];
                  IDSetNumber(&offyNPR, "Guider is offline.");
                  return;
              }
-             
-             stageGoTo(RS485_FD, offyNPR.name, (int)(values[0]/ENCODER2MM));
+             //TODO check which mirros is in.
+             stageGoTo(RS485_FD, offyNPR.name, (int)(values[0]+YOFFSET/ENCODER2MM));
 	
 	     offyNPR.s = IPS_IDLE;
 	     IDSetNumber(&offyNPR, NULL);
@@ -1180,7 +1182,7 @@ static int guiderTelem(int init_struct)
 			}
 			
 
-			pNVP->np[0].value = motor->pos*ENCODER2MM;
+			//pNVP->np[0].value = motor->pos*ENCODER2MM;
 			w0_statusLight = indi_motors[motor->motor_num-1].word0L;
 			w0_statusLightVP = &indi_motors[motor->motor_num-1].word0LP;
 			w1_statusLight = indi_motors[motor->motor_num-1].word1L;
@@ -1236,7 +1238,7 @@ static int guiderTelem(int init_struct)
 
 		}
 		//motor specific things
-		if( !strcmp( motor->name, "LOWER_FWHEEL" ) )
+		if( !strcmp( motor->name, "FWHEEL_LOWER" ) )
 		{
 			if( motor->isMoving )
 			{
@@ -1249,7 +1251,7 @@ static int guiderTelem(int init_struct)
 			IDSetSwitch(&lfSP, NULL);
 		}
 
-		else if( !strcmp( motor->name, "UPPER_FWHEEL" ) )
+		else if( !strcmp( motor->name, "FWHEEL_UPPER" ) )
 		{
 			if( motor->isMoving )
 			{
@@ -1261,7 +1263,7 @@ static int guiderTelem(int init_struct)
 			}
 			IDSetSwitch(&ufSP, NULL);
 		}
-		else if( !strcmp( motor->name, "GUIDER_FWHEEL" ) )
+		else if( !strcmp( motor->name, "OFFSET_FWHEEL" ) )
 		{
 			if( motor->isMoving )
 			{
@@ -1273,7 +1275,19 @@ static int guiderTelem(int init_struct)
 			}
 			IDSetSwitch(&gfSP, NULL);
 		}
+		else if( !strcmp( motor->name, "OFFSET_X" ) )
+		{
+				pNVP->np[0].value = (motor->pos*ENCODER2MM)-XOFFSET;
+		}
+		else if( !strcmp( motor->name, "OFFSET_Y" ) )
+		{
+				pNVP->np[0].value = (motor->pos*ENCODER2MM)-YOFFSET;
+		}
 
+		else if( !strcmp( motor->name, "OFFSET_FOCUS" ) )
+		{
+			 pNVP->np[0].value = (motor->pos*ENCODER2MM);
+		}
 		iter++;
 		IDSetNumber(pNVP, NULL);
 	}
@@ -1543,7 +1557,11 @@ static void fillFWheels()
 }
 
 
-
+double focus_trans(double x, double y)
+{
+	double r = sqrt(x*x + y*y);
+	return  33.325*r*r - 0.0063*r + 0.0012;
+}
 
 /*
 TODO:
