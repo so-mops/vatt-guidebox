@@ -50,8 +50,8 @@
 
 //TODO these should be in a config file
 #define ENCODER2MM (1.0/2000.0)
-#define XOFFSET 103.6
-#define YOFFSET 53.5
+#define XOFFSET 102.6
+#define YOFFSET 39.5
 #define YOFFSET_UMIRROR 58.25
 
 #define POLLMS          1000                             /* poll period, ms */
