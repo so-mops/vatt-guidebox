@@ -39,7 +39,8 @@ test.o:	test.c
 	gcc $(GCCFLAGS) -c test.c
 
 
-
+install:
+	cp ./indi-vatt-guidebox /usr/local/bin/
 
 ###############utils#######################
 clean: \
