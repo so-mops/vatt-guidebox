@@ -38,6 +38,7 @@
 #define mydev		"INDI-VATT-GUIDEBOX"
 #define MAIN_GROUP	"Guider Control"                  /* Group name */
 #define ENG_GROUP	"Engineering"
+#define qrydev	 	"QDEV"
 
 #define MOT1_GROUP "MOTOR 1 Eng"
 #define MOT2_GROUP "MOTOR 2 Eng"
@@ -80,6 +81,7 @@ static void fillMotors();
 static void fillFWheels();
 static int saveFNames(char *, char *, char *);
 static int loadFNames(char *, char[5][20]);
+static int getCurrentFilters(char *, char *);
 
 //global memory for IText properties
 char gttyPORT[20];
@@ -94,6 +96,11 @@ static ISwitch connectS[] = {
 	 };
 static ISwitchVectorProperty connectSP = { mydev, "CONNECTION", "Connection",  MAIN_GROUP, IP_RW, ISR_NOFMANY, 0, IPS_IDLE,  connectS, NARRAY(connectS), "", 0 };
  
+static ISwitch getdataS[] = {
+	{"GETDATA",  "Get Data",  ISS_OFF, 0, 0}
+     //{"GETDATA",  "On",  ISS_OFF, 0, 0}, {"DISGETDATA", "Off", ISS_ON, 0, 0}
+	 };
+static ISwitchVectorProperty getdataSP = { qrydev, "GETDATA", "Get Data",  MAIN_GROUP, IP_RW, ISR_NOFMANY, 0, IPS_IDLE,  getdataS, NARRAY(getdataS), "", 0 };
 
 		
 
@@ -170,7 +177,7 @@ static INumberVectorProperty ofwNPR = {  mydev, "OFFSET_FWHEEL", "offset filter 
 
 
 
-/*
+/*****************************************************
  * 		A note on Text Properties in INDI:
  *		Each IText struct has a char pointer
  *		member named "text". The memory this pointer
@@ -185,7 +192,7 @@ static INumberVectorProperty ofwNPR = {  mydev, "OFFSET_FWHEEL", "offset filter 
  *		flip out and give a seg fault. Instead of IUUpdate, 
  *		I use strcpy to copy whatever text I want to the 
  *		IText.text memeber and update the client with IDSetText. 
- */
+ *************************************************************/
 
 
 // Head Node Name
@@ -196,26 +203,11 @@ static ITextVectorProperty head_nodeTP = { mydev, "HEAD", "Head Motor Node", ENG
 
 
 //Filter wheel buttons
-static ISwitch lfS[]  = {
-	{"LF0S",  "Clear",  ISS_OFF, 0, 0},
-	{"LF1S",  "",  ISS_OFF, 0, 0},
-	{"LF2S",  "",  ISS_OFF, 0, 0},
-	{"LF3S",  "",  ISS_OFF, 0, 0},
-	{"LF4S",  "",  ISS_OFF, 0, 0},
-	};
+static ISwitch lfS[5];
+static ISwitchVectorProperty lfSP;
 
-ISwitchVectorProperty lfSP      = { mydev, "LFS", "Lower Wheel",  MAIN_GROUP, IP_RW, ISR_1OFMANY, 0, IPS_IDLE,  lfS, NARRAY(lfS), "", 0 };
-
-static ISwitch ufS[]  = {
-	{"UF0S",  "Clear",  ISS_OFF, 0, 0},
-	{"UF1S",  "",  ISS_OFF, 0, 0},
-	{"UF2S",  "",  ISS_OFF, 0, 0},
-	{"UF3S",  "",  ISS_OFF, 0, 0},
-	{"UF4S",  "",  ISS_OFF, 0, 0},
-	};
-
-ISwitchVectorProperty ufSP      = { mydev, "UFS", "Upper Wheel",  MAIN_GROUP, IP_RW, ISR_1OFMANY, 0, IPS_IDLE,  ufS, NARRAY(ufS), "", 0 };
-
+static ISwitch ufS[5];
+static ISwitchVectorProperty ufSP;
 
 static ISwitch gfS[]  = {
 	{"GF0S",  "Clear",  ISS_OFF, 0, 0},
@@ -240,11 +232,11 @@ ISwitchVectorProperty mirr_posSP      = { mydev, "MIRRORS", "Mirror",  MAIN_GROU
 
 // User given names for filters in lower filter wheel
 static IText lfnT[] = {
-	{"F0", "Filter 0", "", 0, 0, 0},
-	{"F1", "Filter 1", "", 0, 0, 0},
-	{"F2", "Filter 2", "", 0, 0, 0},
-	{"F3", "Filter 3", "", 0, 0, 0},
-	{"F4", "Filter 4", "", 0, 0, 0},
+	{"F0", "Filter 0", "Clear", 0, 0, 0},
+	{"F1", "Filter 1", "lf1", 0, 0, 0},
+	{"F2", "Filter 2", "lf2", 0, 0, 0},
+	{"F3", "Filter 3", "lf3", 0, 0, 0},
+	{"F4", "Filter 4", "lf4", 0, 0, 0},
 };
 
 char lfnChars[5][30];
@@ -254,11 +246,11 @@ static ITextVectorProperty lfnTP = { mydev, "LOWER_FNAMES", "Lower Filter Wheel 
 
 // User given names for filters in upper filter wheel
 static IText ufnT[] = {
-	{"F0", "Filter 0", "", 0, 0, 0},
-	{"F1", "Filter 1", "", 0, 0, 0},
-	{"F2", "Filter 2", "", 0, 0, 0},
-	{"F3", "Filter 3", "", 0, 0, 0},
-	{"F4", "Filter 4", "", 0, 0, 0},
+	{"F0", "Filter 0", "Clear", 0, 0, 0},
+	{"F1", "Fiuter 1", "uf1", 0, 0, 0},
+	{"F2", "Fiuter 2", "uf2", 0, 0, 0},
+	{"F3", "Fiuter 3", "uf3", 0, 0, 0},
+	{"F4", "Fiuter 4", "uf4", 0, 0, 0},
 };
 
 char ufnChars[5][30];
@@ -340,57 +332,69 @@ char rawCmdString[50];
 #############################################################################*/
  void ISGetProperties (const char *dev)
  {
-		char filter_names[5][20];
-		if (dev && strcmp (mydev, dev))
-			return;
- 
+	
+	char filter_names[5][20];
+	char upper[20], lower[20];
+	fprintf(stderr, "WHAT THE FUCK %s\n\n\n", dev);
+	if (dev && strcmp (mydev, dev))
+	{
+		if(!strcmp(qrydev, dev))
+		{
+			getCurrentFilters(upper, lower);
+			IDMessage(qrydev, "%s %s", upper, lower);
+		}
+		return;
+	}
+
 /********Telemetry***********/
-        IDDefSwitch (&connectSP, NULL);
-        IDDefSwitch (&engSwitchSP, NULL);
+	IDDefSwitch (&connectSP, NULL);
+	IDDefSwitch (&engSwitchSP, NULL);
 
-		IDDefSwitch (&comTypeSP, NULL);
+	IDDefSwitch (&comTypeSP, NULL);
 
-		IDDefSwitch (&resetLtxSP, NULL);
+	IDDefSwitch (&resetLtxSP, NULL);
 
-		IDDefText(&networkTP, NULL);
-		networkTP.tp[0].text = gnetwork;
+	IDDefSwitch(&getdataSP, NULL);
+	IDDefText(&networkTP, NULL);
+	networkTP.tp[0].text = gnetwork;
 
-		IDDefText(&ttyPortTP, NULL);
-		ttyPortTP.tp[0].text = gttyPORT;
+	IDDefText(&ttyPortTP, NULL);
+	ttyPortTP.tp[0].text = gttyPORT;
 
-		IDDefText(&rawCmdTP, NULL);
-		rawCmdT[0].text = rawCmdString;
-		
-		IDDefSwitch(&lfSP, NULL);
-		IDDefSwitch(&ufSP, NULL);
-		IDDefSwitch(&gfSP, NULL);
+	IDDefText(&rawCmdTP, NULL);
+	rawCmdT[0].text = rawCmdString;
+	
+	IDDefSwitch(&lfSP, NULL);
+	IDDefSwitch(&ufSP, NULL);
+	IDDefSwitch(&gfSP, NULL);
 
-		IDDefSwitch(&serialfixSP, NULL);
-		IDDefSwitch(&mirr_posSP, NULL);
+	IDDefSwitch(&serialfixSP, NULL);
+	IDDefSwitch(&mirr_posSP, NULL);
 
-		IDDefText(&head_nodeTP, NULL);
-		head_nodeT[0].text = head_nodeString;
-
-		fillFWheels();		
-		fillMotors();
-
-		//TODO this should be read from a config file.
-		strcpy(ttyPortTP.tp[0].text, "/dev/ttyUSB0");
-		strcpy(networkTP.tp[0].text, "10.0.3.86:10001");
-		gcomtype = SER;
-		/*
-		
-		IDDefText(&motor1TP, NULL);
-		motor1T[0].text  = gstatusString[0];
-
-		IDDefLight( &motor1W0LP, NULL );
+	IDDefText(&head_nodeTP, NULL);
+	head_nodeT[0].text = head_nodeString;
 
 
-		IDDefText(&motor2TP, NULL);
-		motor2T[0].text  = gstatusString[1];
+	fillFWheels();		
+	fillMotors();
 
-		IDDefLight( &motor2W0LP, NULL );
-		*/
+	//TODO this should be read from a config file.
+	strcpy(ttyPortTP.tp[0].text, "/dev/ttyUSB0");
+	strcpy(networkTP.tp[0].text, "10.0.3.86:10001");
+	gcomtype = SER;
+	/*
+	
+	IDDefText(&motor1TP, NULL);
+	motor1T[0].text  = gstatusString[0];
+
+	IDDefLight( &motor1W0LP, NULL );
+
+
+	IDDefText(&motor2TP, NULL);
+	motor2T[0].text  = gstatusString[1];
+
+	IDDefLight( &motor2W0LP, NULL );
+	*/
 //	IDDefText  (&stdTelemTP, NULL);
         
 /***********GOTO*************/
@@ -478,9 +482,11 @@ char rawCmdString[50];
 		//IUUpdateText(&lfnTP, texts, names, n);
 		for(int jj=0; jj<n; jj++)
 		{
-			strcpy( lfnT[jj].text, texts[jj] );
-			if( strcmp(texts[jj], "") != 0 )
-				saveFNames(lfnTP.name, texts[jj], ufnT[jj].name );
+			if( strcmp(texts[jj],  lfnT[jj].text) )
+			{
+				strcpy( lfnT[jj].text, texts[jj] );
+				saveFNames(lfnTP.name, texts[jj], lfnT[jj].name );
+			}
 		}
 		IDSetText(&lfnTP, NULL );
 		
@@ -492,9 +498,11 @@ char rawCmdString[50];
 		//IUUpdateText(&ufnTP, texts, names, n);
 		for(int jj=0; jj<n; jj++)
 		{
-			strcpy( ufnT[jj].text, texts[jj] );
-			if( strcmp(texts[jj], "") != 0 )
+			if( strcmp(texts[jj], ufnT[jj].text) != 0 )
+			{
+				strcpy( ufnT[jj].text, texts[jj] );
 				saveFNames(ufnTP.name, texts[jj], ufnT[jj].name );
+			}
 		}
 		IDSetText(&ufnTP, NULL );
 	}
@@ -673,6 +681,7 @@ char respbuffer[50];
 char L, F, S;
 int fnum;
 
+	fprintf(stderr, "new switch");
 	/* ignore if not ours */
 	if (strcmp (dev, mydev))
 		return;
@@ -1425,7 +1434,7 @@ void guiderProc (void *p)
 
     if(p != NULL)// we only need to init the allmotors struct once.
 	{
-		IDMessage(mydev, "INITING STRUCT");
+		//IDMessage(mydev, "INITING STRUCT");
 		init_struct=1;
 	}
 	else
@@ -1638,6 +1647,7 @@ static void fillMotors()
 static void fillFWheels()
 {
 		//TODO should probably be in a config file
+		char upper_name[20], lower_name[20];
 		const char guider_filters[][20] = {
 			"U",
 			"B",
@@ -1645,21 +1655,42 @@ static void fillFWheels()
 			"R",
 			"I"
 		};
+		const char default_filters[][20] = {
+			"Clear",
+			"Filter 1",
+			"Filter 2",
+			"Filter 3",
+			"Filter 4"
+		};
+
+		char upper_fnames[5][20];
+		char lower_fnames[5][20];
+		loadFNames(lfnTP.name, lower_fnames);
+		loadFNames(ufnTP.name, upper_fnames);
 
 		for(int ii=0; ii<5; ii++)
 		{	//point the text propterties at there 
 			//assoctiated char arrays
-
+			
+			strcpy( lfnChars[ii], lower_fnames[ii] );
 			lfnT[ii].text = lfnChars[ii];
 			IDDefText(&lfnTP, NULL);
 
+			strcpy( ufnChars[ii], upper_fnames[ii] );
 			ufnT[ii].text = ufnChars[ii];
 			IDDefText(&ufnTP, NULL);
 			
+			sprintf(upper_name, "UF%iS", ii);
+			sprintf(lower_name, "LF%iS", ii);
+			IUFillSwitch(&ufS[ii], upper_name, upper_fnames[ii], ISS_OFF);
+			IUFillSwitch(&lfS[ii], lower_name, lower_fnames[ii], ISS_OFF);
+
 			strcpy( gfnChars[ii], guider_filters[ii] );
 			gfnT[ii].text = gfnChars[ii];
 			IDDefText(&gfnTP, NULL);
 		}
+		IUFillSwitchVector( &ufSP, ufS, NARRAY(ufS), mydev, "UFS", "Upper Wheel",  MAIN_GROUP, IP_RW, ISR_1OFMANY, 0, IPS_IDLE);
+		IUFillSwitchVector( &lfSP, lfS, NARRAY(lfS), mydev, "LFS", "Lower Wheel",  MAIN_GROUP, IP_RW, ISR_1OFMANY, 0, IPS_IDLE);
 }
 
 
@@ -1706,24 +1737,24 @@ static int saveFNames(char *wheel, char *name, char *fnum)
 	if(fid)
 	{
 		
-		wc = fscanf(fid, "%s %s %s %s %s", filters[0], filters[1], filters[2], filters[3], filters[4] );
+		wc = fscanf(fid, "%[^,], %[^,], %[^,], %[^,], %s", filters[0], filters[1], filters[2], filters[3], filters[4] );
 		fclose(fid);
 		fid = fopen(wheel, "w");//clear the file
 		if(wc == 5)
 		{
 			strcpy( filters[num], name );
-			fprintf(fid, "%s %s %s %s %s", filters[0], filters[1], filters[2], filters[3], filters[4]);
+			IDMessage(mydev, "%s, %s, %s, %s, %s", filters[0], filters[1], filters[2], filters[3], filters[4]);
+			fprintf(fid, "%s, %s, %s, %s, %s", filters[0], filters[1], filters[2], filters[3], filters[4]);
 		}
 		else
 		{// oops corrupted file
 			for(int ii=0; ii<5; ii++)
 			{
-				strcpy( filters[ii], "????" );
-				
+				sprintf( filters[ii], "Filter %i", ii );
 			}
 			
 			strcpy( filters[num], name );
-			fprintf(fid, "%s %s %s %s %s", filters[0], filters[1], filters[2], filters[3], filters[4]);
+			fprintf(fid, "%s, %s, %s, %s, %s", filters[0], filters[1], filters[2], filters[3], filters[4]);
 		}	
 	}
 	else
@@ -1731,10 +1762,11 @@ static int saveFNames(char *wheel, char *name, char *fnum)
 		fid = fopen(wheel, "w");
 		for(int ii=0; ii<5; ii++)
 		{
-			strcpy( filters[ii], "????" );	
+			sprintf( filters[ii], "Filter %i", ii  );
 		}
+		fprintf(stderr, "SHOULD BE SETTING %i %s %s\n", num, fnum, name );
 		strcpy( filters[num], name);
-		fprintf( fid, "%s %s %s %s %s", filters[0], filters[1], filters[2], filters[3], filters[4]);
+		fprintf( fid, "%s, %s, %s, %s, %s", filters[0], filters[1], filters[2], filters[3], filters[4]);
 	}
 	
 	fclose(fid);
@@ -1745,26 +1777,77 @@ static int loadFNames(char * wheel, char filters[5][20])
 	FILE *fid;
 	if( access( wheel, F_OK ) != 1 )
 		fid = fopen(wheel, "r");
-	else	
+	else
 	{
 		fid = NULL;
 	}
 	
 	if(fid)
 	{
-		int wc = fscanf(fid, "%s %s %s %s %s", filters[0], filters[1], filters[2], filters[3], filters[4]);
+		//comma separated filters.
+		int wc = fscanf(fid, "%[^,], %[^,], %[^,], %[^,], %s", filters[0], filters[1], filters[2], filters[3], filters[4] );
+
+		//the first filter is always clear.
+		strcpy(filters[0], "Clear");
 	}
 	else
-	{
-		for(int ii=1; ii<4; ii++)
+	{//File doesn't exist
+		for(int ii=0; ii<5; ii++)
 		{
-			strcpy(filters[ii], "??????");
+			if(ii!=0)
+				sprintf(filters[ii], "Filter %i", ii);
+			else
+				sprintf(filters[ii], "Clear");
+			
 		}
 	}
-	strcpy(filters[0], "Clear");//first one is always clear
 	for(int ii=0; ii<5; ii++)
 	{
 		fprintf(stderr, "%i %s %s \n", ii, wheel, filters[ii]);
 	}
 }
+
+
+static int getCurrentFilters(char *upper, char *lower)
+{
+	int iter=0, lower_num=0, upper_num=0;
+	
+	for(ISwitch *lower=lfS; lower!=lfS+5; lower++)
+	{	
+		IDMessage(qrydev, "%s", lower->name);
+		if(lower->s == ISS_ON)
+		{
+			IDMessage(qrydev, "YEAH %s", lower->name);
+			lower_num=iter;
+			break;
+		}
+		iter++;
+	}
+
+	iter=0;
+	for(ISwitch *upper=ufS; upper!=ufS+5; upper++)
+	{
+		IDMessage(qrydev, "%s %i", upper->name, upper->s);
+		if(upper->s == ISS_ON)
+		{
+			IDMessage(qrydev, "YEA %s", upper->name);
+			upper_num=iter;
+			break;
+		}
+		iter++;
+	}
+
+	IDMessage(qrydev, "%i %i", upper_num, lower_num);
+	if( ufnT[upper_num].text != NULL)
+		strcpy(upper, ufnT[upper_num].text);
+	else
+		strcpy(upper, "IDK");
+	
+	if( lfnT[lower_num].text != NULL)
+		strcpy(lower, lfnT[lower_num].text);
+	else
+		strcpy(lower, "IDK");
+
+}
+
 

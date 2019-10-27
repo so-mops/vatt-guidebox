@@ -765,7 +765,7 @@ int moog_getallstatus_quick(int rs485_fd, MSTATUS motors[])
 		}
 		else
 		{
-			fprintf(stderr, "{%s}\n", resp );
+			//fprintf(stderr, "{%s}\n", resp );
 		}
 		//fprintf(stderr, " %i %i %i %i %i %i %i %i %i\n", motor_num, pos, f, w0, w1, w2, w3, userbits, iobits );
 		for(MSTATUS *motor=motors; motor!=motors+NMOTORS; motor++)
@@ -796,7 +796,6 @@ int moog_getallstatus_quick(int rs485_fd, MSTATUS motors[])
 		
 		fprintf(stderr, "We are missing motors\n");
 	}
-	fprintf(stderr, "END getallstatus %i \n", active );
 	return active;
 }
 
