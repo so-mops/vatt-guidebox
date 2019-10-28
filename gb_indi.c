@@ -38,7 +38,7 @@
 #define mydev		"INDI-VATT-GUIDEBOX"
 #define MAIN_GROUP	"Guider Control"                  /* Group name */
 #define ENG_GROUP	"Engineering"
-#define qrydev	 	"QDEV"
+#define qrydev	 	"FILTERS"
 
 #define MOT1_GROUP "MOTOR 1 Eng"
 #define MOT2_GROUP "MOTOR 2 Eng"
@@ -82,6 +82,8 @@ static void fillFWheels();
 static int saveFNames(char *, char *, char *);
 static int loadFNames(char *, char[5][20]);
 static int getCurrentFilters(char *, char *);
+static void defMotors();
+static void defWheels();
 
 //global memory for IText properties
 char gttyPORT[20];
@@ -332,21 +334,33 @@ char rawCmdString[50];
 #############################################################################*/
  void ISGetProperties (const char *dev)
  {
-	
+	static int firstGetProperties = 1;
 	char filter_names[5][20];
 	char upper[20], lower[20];
-	fprintf(stderr, "WHAT THE FUCK %s\n\n\n", dev);
+	
 	if (dev && strcmp (mydev, dev))
 	{
 		if(!strcmp(qrydev, dev))
 		{
 			getCurrentFilters(upper, lower);
-			IDMessage(qrydev, "%s %s", upper, lower);
+			IDMessage(qrydev, "upper:%s lower:%s", upper, lower);
 		}
 		return;
 	}
 
-/********Telemetry***********/
+	if(firstGetProperties)
+	{
+		networkTP.tp[0].text = gnetwork;
+		ttyPortTP.tp[0].text = gttyPORT;
+		rawCmdT[0].text = rawCmdString;
+		head_nodeT[0].text = head_nodeString;
+		strcpy(ttyPortTP.tp[0].text, "/dev/ttyUSB0");
+		strcpy(networkTP.tp[0].text, "10.0.3.86:10001");
+		fillFWheels();		
+		fillMotors();
+		firstGetProperties=0;
+	}
+
 	IDDefSwitch (&connectSP, NULL);
 	IDDefSwitch (&engSwitchSP, NULL);
 
@@ -356,13 +370,10 @@ char rawCmdString[50];
 
 	IDDefSwitch(&getdataSP, NULL);
 	IDDefText(&networkTP, NULL);
-	networkTP.tp[0].text = gnetwork;
 
 	IDDefText(&ttyPortTP, NULL);
-	ttyPortTP.tp[0].text = gttyPORT;
 
 	IDDefText(&rawCmdTP, NULL);
-	rawCmdT[0].text = rawCmdString;
 	
 	IDDefSwitch(&lfSP, NULL);
 	IDDefSwitch(&ufSP, NULL);
@@ -372,32 +383,14 @@ char rawCmdString[50];
 	IDDefSwitch(&mirr_posSP, NULL);
 
 	IDDefText(&head_nodeTP, NULL);
-	head_nodeT[0].text = head_nodeString;
+
+	defMotors();
+	defWheels();
 
 
-	fillFWheels();		
-	fillMotors();
-
-	//TODO this should be read from a config file.
-	strcpy(ttyPortTP.tp[0].text, "/dev/ttyUSB0");
-	strcpy(networkTP.tp[0].text, "10.0.3.86:10001");
 	gcomtype = SER;
-	/*
-	
-	IDDefText(&motor1TP, NULL);
-	motor1T[0].text  = gstatusString[0];
-
-	IDDefLight( &motor1W0LP, NULL );
-
-
-	IDDefText(&motor2TP, NULL);
-	motor2T[0].text  = gstatusString[1];
-
-	IDDefLight( &motor2W0LP, NULL );
-	*/
-//	IDDefText  (&stdTelemTP, NULL);
         
-/***********GOTO*************/
+	/***********GOTO*************/
 	IDDefNumber  (&ufwNPR, NULL);
 	IDDefNumber  (&lfwNPR, NULL);
 	IDDefNumber  (&offxNPR, NULL);
@@ -419,6 +412,7 @@ char rawCmdString[50];
 	}
          
  }
+
 
 /*############################################################################
 #  Title: ISNewText
@@ -681,7 +675,6 @@ char respbuffer[50];
 char L, F, S;
 int fnum;
 
-	fprintf(stderr, "new switch");
 	/* ignore if not ours */
 	if (strcmp (dev, mydev))
 		return;
@@ -1012,7 +1005,6 @@ int fnum;
 	
 	//IDMessage(mydev, "Connecting To  %s:%i using %s / %s",NET_ADDR,PORT,TELID,SYSID);
 	
-         zeroTelem(); // zero telem
          
          if (inited)//do not do below functions if already inited
              return;
@@ -1025,35 +1017,7 @@ int fnum;
          
  }
 
-/*############################################################################
-#  Title: zeroTelem
-#  Author: Chris Johnson
-#  Date: 11/20/12
-#  Args:  N/A
-#  Description: Stuffs all of the telemetry strings with Zero
-#
-#############################################################################*/
-static void zeroTelem()
- {
-/*        char zerAll[] = "-00.000 00 00 -000.00000 -000.0000000 -000.000000 -000.00000 -000.0000000 -000.0000000 -000.00000 -000.0000000 -000.0000000 -000.00000 00 00";
-	 
-	
-	int  err;
-	double num;
 
-        sscanf(zerAll, "%s %s %s %s %s %s %s %s %s %s %s %s %s %s %s", 
-		stdTelem.del,stdTelem.mod,stdTelem.init,stdTelem.telaz,
-		stdTelem.az,stdTelem.home,stdTelem.cpd,stdTelem.sd,
-		stdTelem.w,stdTelem.sdw,stdTelem.nu,stdTelem.rho,stdTelem.phi,
-		stdTelem.look,stdTelem.hold);
-
-	sprintf(stdTelem.mod, "STOWED");
-
-	IDSetText(&stdTelemTP, NULL);*/
-	
-	
-
- }
 
 
 /*############################################################################
@@ -1121,6 +1085,7 @@ static int guiderTelem(int init_struct)
  {
         char ret[121], ret2[121], guiderResponse[300], mname[30] ;
 	char fwheel_upper[5], fwheel_lower[5];
+	char lower_name[20];
 	int fwheel_upper_isOff, fwheel_lower_isOff;
 	int  err, ix, isFilter, active, allHomed=1;
 	double num;
@@ -1166,7 +1131,7 @@ static int guiderTelem(int init_struct)
 	//this is caught later when we do the if pNVP == NULL 
 	//a few lines below
 	
-	active = doTelemetry(RS485_FD, allmotors, init_struct);
+	active = doTelemetry( RS485_FD, allmotors, init_struct );
 
 	if(init_struct)
 	{
@@ -1182,17 +1147,15 @@ static int guiderTelem(int init_struct)
 			//apply names to indi_motors from allmotors array.
 			//Here we associate the indi_motor index with the 
 			//motor->motor_num
-			if (indi_motors[motor->motor_num-1].nameT[0].text !=  NULL)
-				strncpy(indi_motors[motor->motor_num-1].nameT[0].text,  motor->name, 30);
+			if ( indi_motors[motor->motor_num-1].nameT[0].text !=  NULL )
+				strncpy( indi_motors[motor->motor_num-1].nameT[0].text,  motor->name, 30 );
 			indi_motors[motor->motor_num-1].motor_num  = motor->motor_num;
-			IDSetText(&indi_motors[motor->motor_num-1].nameTP, NULL);
+			//IDSetText( &indi_motors[motor->motor_num-1].nameTP, NULL );
 			if( motor->head_node == motor->motor_num )
 			{
-				strcpy(head_nodeT[0].text, motor->name);
-				IDSetText(&head_nodeTP, NULL);
+				strcpy( head_nodeT[0].text, motor->name );
+				IDSetText( &head_nodeTP, NULL );
 			}
-			
-			
 		}
 
 		//motor2nvp uses the motor->name to 
@@ -1310,6 +1273,13 @@ static int guiderTelem(int init_struct)
 				IUResetSwitch(&lfSP);
 				lfS[motor->fnum].s = ISS_ON;
 				lfSP.s = IPS_OK;
+				for(int ii=1; ii<5; ii++)
+				{
+					strcpy(lfS[ii].label, lfnT[ii].text);
+					IDMessage(mydev, "%s %s", lfS[ii].label, lfnT[ii].text);
+					sprintf(lower_name, "LF%iS", ii);
+					IUFillSwitch(&lfS[ii], lower_name, lfnT[ii].text, lfS[ii].s);
+				}
 					
 			}
 			IDSetSwitch(&lfSP, NULL);
@@ -1363,8 +1333,24 @@ static int guiderTelem(int init_struct)
 		}
 		else if( !strcmp( motor->name, "OFFSET_MIRRORS" ) )
 		{
-			
 			pNVP->np[0].value = (motor->pos*ENCODER2MM);
+
+			mirr_posS[0].s = ISS_OFF;
+			mirr_posS[1].s = ISS_OFF;
+			mirr_posS[2].s = ISS_OFF;
+
+			if((166.0 < motor->pos*ENCODER2MM) && (motor->pos*ENCODER2MM < 169.0))
+			{
+				mirr_posS[0].s = ISS_ON;
+			}
+			else if(( 1.0 < motor->pos*ENCODER2MM) && (motor->pos*ENCODER2MM < 4.0 ) )
+			{
+				mirr_posS[1].s = ISS_ON;
+			}
+			else if(( -1.0 < motor->pos*ENCODER2MM ) && ( motor->pos*ENCODER2MM < 1.0 ) )
+			{
+				mirr_posS[1].s = ISS_ON;
+			}
 			if(motor->isMoving)
 			{
 				mirr_posSP.s = IPS_BUSY;
@@ -1373,6 +1359,7 @@ static int guiderTelem(int init_struct)
 			{
 				mirr_posSP.s = IPS_OK;
 			}
+			
 			IDSetSwitch(&mirr_posSP, NULL);
 				
 		}
@@ -1389,7 +1376,7 @@ static int guiderTelem(int init_struct)
 	}
 	IDSetSwitch(&actionSP, NULL );
 
-
+	
 	//solenoid sensor stays on due to bug in firmware
 	//we shall fix it here until the firmware is fixed. 
 	if(fwheel_lower_isOff && fwheel_upper_isOff)
@@ -1478,44 +1465,6 @@ void guiderProc (void *p)
  
 
 
-
-/***********************************************************
- *Name: buildMStatusString
- *args: motor -> MSTATUS struct from allmotors array
- *		mstring -> string to populate with motor status infor
- *Description:
- * 				Build a string of usefull status info.
- * 				We no longer use this function to populate
- * 				a string. We decided a set of various widgets
- * 				would be more apt to display status. 
- *		-Scott Swindell 9/2019
- * **********************************************************/
-static void buildMStatusString(MSTATUS *motor, char mstring[])
-{
-	char dummy[100];
-	snprintf(dummy, 50, "%s(%i)\n", motor->name, motor->motor_num);
-	strcat(mstring, dummy );
-	
-	if(motor->isActive)
-	{
-		snprintf(dummy, 30, "Encoder Pos:%i ", motor->pos);
-		strcat(mstring, dummy);
-		if(motor->isFilter)
-			snprintf(dummy, 20, "| Filter Number:%i", motor->fnum);
-		strcat(mstring, dummy);
-		strcat(mstring, "\n");
-
-	}
-	else
-	{
-		strcat(mstring, "Not Active!");
-	}
-	
-	
-}
-
-
-
 static void fillMotors()
 {
 	char name[20];
@@ -1575,7 +1524,7 @@ static void fillMotors()
 		snprintf( name, 20, "M%iLIM", motor_num );
 		IUFillSwitchVector(&imotor->engSwitchesSP, imotor->engSwitchesS, NARRAY(imotor->engSwitchesS), mydev, name, "Special", group, IP_RW, ISR_NOFMANY, 0, IPS_IDLE);
 		IUFillSwitch(imotor->engSwitchesS, name, "Get Out of Limit", IPS_IDLE);
-
+		
 		snprintf( name, 20, "M%iHOME", motor_num );
 		IUFillSwitch(imotor->engSwitchesS+1, name, "Home", IPS_IDLE);
 		IDDefSwitch(&imotor->engSwitchesSP, NULL);
@@ -1587,12 +1536,10 @@ static void fillMotors()
 
 		imotor->nameT[0].text = imotor->nameString;
 		IDDefText(&imotor->nameTP, NULL);
-		
 
 		snprintf( label, 20, "Motor %i Word 0", motor_num );
 		snprintf( name, 20, "M%iW0", motor_num );
 		IUFillLightVector(&imotor->word0LP, imotor->word0L, NARRAY(imotor->word0L), mydev, (const char *) name, (const char *) label, group, IPS_IDLE );
-		
 		
 		//Populate the status bits with the correct code
 		for(int code_num=0; code_num<16; code_num++)
@@ -1620,6 +1567,7 @@ static void fillMotors()
 				//IDMessage(mydev, "WE MADE IT TO ENABLE");
 			}
 		}
+
 		IDDefLight(&imotor->word0LP, NULL);
 		IDDefSwitch(&imotor->iowordSP, NULL);
 
@@ -1638,11 +1586,24 @@ static void fillMotors()
 			IUFillLight(imotor->word1L+code_num, name, code, IPS_IDLE);
 		}
 		IDDefLight(&imotor->word1LP, NULL);
-
 		motor_num++;
 	}
 }
 
+
+
+static void defMotors()
+{
+
+	for(INDIMOTOR *imotor=indi_motors; imotor!=indi_motors+7; imotor++)
+	{
+		IDDefSwitch(&imotor->engSwitchesSP, NULL);
+		//IDDefText(&imotor->nameTP, NULL);
+		IDDefLight(&imotor->word0LP, NULL);
+		IDDefSwitch(&imotor->iowordSP, NULL);
+		IDDefLight(&imotor->word1LP, NULL);
+	}
+}
 
 static void fillFWheels()
 {
@@ -1674,11 +1635,9 @@ static void fillFWheels()
 			
 			strcpy( lfnChars[ii], lower_fnames[ii] );
 			lfnT[ii].text = lfnChars[ii];
-			IDDefText(&lfnTP, NULL);
 
 			strcpy( ufnChars[ii], upper_fnames[ii] );
 			ufnT[ii].text = ufnChars[ii];
-			IDDefText(&ufnTP, NULL);
 			
 			sprintf(upper_name, "UF%iS", ii);
 			sprintf(lower_name, "LF%iS", ii);
@@ -1687,12 +1646,21 @@ static void fillFWheels()
 
 			strcpy( gfnChars[ii], guider_filters[ii] );
 			gfnT[ii].text = gfnChars[ii];
-			IDDefText(&gfnTP, NULL);
 		}
 		IUFillSwitchVector( &ufSP, ufS, NARRAY(ufS), mydev, "UFS", "Upper Wheel",  MAIN_GROUP, IP_RW, ISR_1OFMANY, 0, IPS_IDLE);
 		IUFillSwitchVector( &lfSP, lfS, NARRAY(lfS), mydev, "LFS", "Lower Wheel",  MAIN_GROUP, IP_RW, ISR_1OFMANY, 0, IPS_IDLE);
 }
 
+
+static void defWheels()
+{
+	for(int ii=0; ii<5; ii++)
+	{
+		IDDefText(&lfnTP, NULL);
+		IDDefText(&ufnTP, NULL);
+		IDDefText(&gfnTP, NULL);
+	}
+}
 
 double focus_trans(double x, double y)
 {
@@ -1722,7 +1690,6 @@ static int saveFNames(char *wheel, char *name, char *fnum)
 	int wc, num;
 	FILE *fid;
 	sscanf(fnum, "%*c%i", &num );
-	IDMessage(mydev, "%s %i %s", fnum, num, name);
 		
 	strcpy(filters[0], "Clear");
 	if( access( wheel, F_OK ) != 1 )
@@ -1814,10 +1781,8 @@ static int getCurrentFilters(char *upper, char *lower)
 	
 	for(ISwitch *lower=lfS; lower!=lfS+5; lower++)
 	{	
-		IDMessage(qrydev, "%s", lower->name);
 		if(lower->s == ISS_ON)
 		{
-			IDMessage(qrydev, "YEAH %s", lower->name);
 			lower_num=iter;
 			break;
 		}
@@ -1827,17 +1792,14 @@ static int getCurrentFilters(char *upper, char *lower)
 	iter=0;
 	for(ISwitch *upper=ufS; upper!=ufS+5; upper++)
 	{
-		IDMessage(qrydev, "%s %i", upper->name, upper->s);
 		if(upper->s == ISS_ON)
 		{
-			IDMessage(qrydev, "YEA %s", upper->name);
 			upper_num=iter;
 			break;
 		}
 		iter++;
 	}
 
-	IDMessage(qrydev, "%i %i", upper_num, lower_num);
 	if( ufnT[upper_num].text != NULL)
 		strcpy(upper, ufnT[upper_num].text);
 	else
