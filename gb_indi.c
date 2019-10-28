@@ -38,7 +38,7 @@
 #define mydev		"INDI-VATT-GUIDEBOX"
 #define MAIN_GROUP	"Guider Control"                  /* Group name */
 #define ENG_GROUP	"Engineering"
-#define qrydev	 	"QDEV"
+#define qrydev	 	"FILTERS"
 
 #define MOT1_GROUP "MOTOR 1 Eng"
 #define MOT2_GROUP "MOTOR 2 Eng"
@@ -343,7 +343,7 @@ char rawCmdString[50];
 		if(!strcmp(qrydev, dev))
 		{
 			getCurrentFilters(upper, lower);
-			IDMessage(qrydev, "%s %s", upper, lower);
+			IDMessage(qrydev, "upper:%s lower:%s", upper, lower);
 		}
 		return;
 	}
@@ -1085,6 +1085,7 @@ static int guiderTelem(int init_struct)
  {
         char ret[121], ret2[121], guiderResponse[300], mname[30] ;
 	char fwheel_upper[5], fwheel_lower[5];
+	char lower_name[20];
 	int fwheel_upper_isOff, fwheel_lower_isOff;
 	int  err, ix, isFilter, active, allHomed=1;
 	double num;
@@ -1149,7 +1150,7 @@ static int guiderTelem(int init_struct)
 			if ( indi_motors[motor->motor_num-1].nameT[0].text !=  NULL )
 				strncpy( indi_motors[motor->motor_num-1].nameT[0].text,  motor->name, 30 );
 			indi_motors[motor->motor_num-1].motor_num  = motor->motor_num;
-			IDSetText( &indi_motors[motor->motor_num-1].nameTP, NULL );
+			//IDSetText( &indi_motors[motor->motor_num-1].nameTP, NULL );
 			if( motor->head_node == motor->motor_num )
 			{
 				strcpy( head_nodeT[0].text, motor->name );
@@ -1272,6 +1273,13 @@ static int guiderTelem(int init_struct)
 				IUResetSwitch(&lfSP);
 				lfS[motor->fnum].s = ISS_ON;
 				lfSP.s = IPS_OK;
+				for(int ii=1; ii<5; ii++)
+				{
+					strcpy(lfS[ii].label, lfnT[ii].text);
+					IDMessage(mydev, "%s %s", lfS[ii].label, lfnT[ii].text);
+					sprintf(lower_name, "LF%iS", ii);
+					IUFillSwitch(&lfS[ii], lower_name, lfnT[ii].text, lfS[ii].s);
+				}
 					
 			}
 			IDSetSwitch(&lfSP, NULL);
@@ -1325,8 +1333,24 @@ static int guiderTelem(int init_struct)
 		}
 		else if( !strcmp( motor->name, "OFFSET_MIRRORS" ) )
 		{
-			
 			pNVP->np[0].value = (motor->pos*ENCODER2MM);
+
+			mirr_posS[0].s = ISS_OFF;
+			mirr_posS[1].s = ISS_OFF;
+			mirr_posS[2].s = ISS_OFF;
+
+			if((166.0 < motor->pos*ENCODER2MM) && (motor->pos*ENCODER2MM < 169.0))
+			{
+				mirr_posS[0].s = ISS_ON;
+			}
+			else if(( 1.0 < motor->pos*ENCODER2MM) && (motor->pos*ENCODER2MM < 4.0 ) )
+			{
+				mirr_posS[1].s = ISS_ON;
+			}
+			else if(( -1.0 < motor->pos*ENCODER2MM ) && ( motor->pos*ENCODER2MM < 1.0 ) )
+			{
+				mirr_posS[1].s = ISS_ON;
+			}
 			if(motor->isMoving)
 			{
 				mirr_posSP.s = IPS_BUSY;
@@ -1335,6 +1359,7 @@ static int guiderTelem(int init_struct)
 			{
 				mirr_posSP.s = IPS_OK;
 			}
+			
 			IDSetSwitch(&mirr_posSP, NULL);
 				
 		}
@@ -1351,7 +1376,7 @@ static int guiderTelem(int init_struct)
 	}
 	IDSetSwitch(&actionSP, NULL );
 
-
+	
 	//solenoid sensor stays on due to bug in firmware
 	//we shall fix it here until the firmware is fixed. 
 	if(fwheel_lower_isOff && fwheel_upper_isOff)
@@ -1561,6 +1586,7 @@ static void fillMotors()
 			IUFillLight(imotor->word1L+code_num, name, code, IPS_IDLE);
 		}
 		IDDefLight(&imotor->word1LP, NULL);
+		motor_num++;
 	}
 }
 
@@ -1572,7 +1598,7 @@ static void defMotors()
 	for(INDIMOTOR *imotor=indi_motors; imotor!=indi_motors+7; imotor++)
 	{
 		IDDefSwitch(&imotor->engSwitchesSP, NULL);
-		IDDefText(&imotor->nameTP, NULL);
+		//IDDefText(&imotor->nameTP, NULL);
 		IDDefLight(&imotor->word0LP, NULL);
 		IDDefSwitch(&imotor->iowordSP, NULL);
 		IDDefLight(&imotor->word1LP, NULL);
@@ -1664,7 +1690,6 @@ static int saveFNames(char *wheel, char *name, char *fnum)
 	int wc, num;
 	FILE *fid;
 	sscanf(fnum, "%*c%i", &num );
-	IDMessage(mydev, "%s %i %s", fnum, num, name);
 		
 	strcpy(filters[0], "Clear");
 	if( access( wheel, F_OK ) != 1 )
@@ -1756,10 +1781,8 @@ static int getCurrentFilters(char *upper, char *lower)
 	
 	for(ISwitch *lower=lfS; lower!=lfS+5; lower++)
 	{	
-		IDMessage(qrydev, "%s", lower->name);
 		if(lower->s == ISS_ON)
 		{
-			IDMessage(qrydev, "YEAH %s", lower->name);
 			lower_num=iter;
 			break;
 		}
@@ -1769,17 +1792,14 @@ static int getCurrentFilters(char *upper, char *lower)
 	iter=0;
 	for(ISwitch *upper=ufS; upper!=ufS+5; upper++)
 	{
-		IDMessage(qrydev, "%s %i", upper->name, upper->s);
 		if(upper->s == ISS_ON)
 		{
-			IDMessage(qrydev, "YEA %s", upper->name);
 			upper_num=iter;
 			break;
 		}
 		iter++;
 	}
 
-	IDMessage(qrydev, "%i %i", upper_num, lower_num);
 	if( ufnT[upper_num].text != NULL)
 		strcpy(upper, ufnT[upper_num].text);
 	else
