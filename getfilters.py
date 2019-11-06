@@ -20,7 +20,7 @@ class vatt_filters:
         """
         soc = socket.socket( socket.AF_INET, socket.SOCK_STREAM )
         HOST = socket.gethostbyname(ip)
-        soc.settimeout(0.1)
+        soc.settimeout(0.5)
         soc.connect( ( HOST, int( port ) ) )
         return soc
 
@@ -41,7 +41,7 @@ class vatt_filters:
         conn = self.connect()
         qrystring = b"<getProperties version='1.7' device='FILTERS' />"
         conn.send(qrystring)
-        regex = re.compile("message=\"(\w*):(\w*) (\w*):(\w*)\"")
+        regex = re.compile("message=\"(\w*):(.*) (\w*):(.*)\"")
         resp = ''
         while True:
             try:
@@ -52,7 +52,7 @@ class vatt_filters:
                 else:
                     raise socket.timeout(
                         "Could not get a response from {} with string {}"
-                        .format(str(conn), qrystring.encode()))
+                        .format(str(conn), qrystring.decode()))
 
             if ">" in resp[-4:]:
                 break
