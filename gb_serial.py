@@ -26,6 +26,18 @@ class gbtalk():
         return resp
 
 
+    def getTelem( self, loop_count=20 ):
+        for a in range(loop_count):
+            self.write("GOSUB(998)")
+            resp = None
+            while resp != '':
+                resp = self.read()
+                print(resp)
+
+
+
+
+
 def read(conn=None):
 
     conn = scottSock("10.0.3.86", 10001, timeout=0.2)
@@ -52,6 +64,6 @@ def getTelem():
     serialfix()
     time.sleep(0.5)
     write("GOSUB(998)")
-    time.sleep(0.5)
+    time.sleep(0.1)
     val = read()
     print(val.replace('\r', '\n'))

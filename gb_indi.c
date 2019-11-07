@@ -136,7 +136,7 @@ static ISwitchVectorProperty engSwitchSP = {mydev, "Switches", "Switches", ENG_G
 Group:  MAIN
 ************************************************/
 //guider actions
-static ISwitch actionS[]  = {{"INITIALIZE",  "Initialize",  ISS_OFF, 0, 0},{"HOME",  "Home",  ISS_OFF, 0, 0}};
+static ISwitch actionS[]  = {{"INITIALIZE",  "Initialize",  ISS_OFF, 0, 0},{"HOME",  "Reference (Home)",  ISS_OFF, 0, 0}};
 
 ISwitchVectorProperty actionSP      = { mydev, "GUIDE_BOX_ACTIONS", "Guide Box Actions",  MAIN_GROUP, IP_RW, ISR_NOFMANY, 0, IPS_IDLE,  actionS, NARRAY(actionS), "", 0 };
 
@@ -745,7 +745,7 @@ int fnum;
 					IDSetSwitch (&connectSP, "Guider is connected.");
 					if(actionS[0].s == ISS_OFF)
 					{
-						gbIndiInit(  );
+						//gbIndiInit(  );
 						actionS[0].s = ISS_ON;
 						IDSetSwitch(&actionSP, "Initializing guider.");
 					}
@@ -1176,8 +1176,12 @@ static int guiderTelem(int init_struct)
 
 		if(!motor->isHomed)
 		{
-			allHomed=0;
+			//ignore homed status if 
+			//motor is not powered
+			if(motor->isActive)
+				allHomed=0;
 		}
+		IDMessage(mydev, "%s isActive? %i", motor->name, motor->isActive);
 		if ( motor->isActive )
 		{/*motor->isActive tells us weather the head node was able to communicate with 
 		 motor over the can bus.*/
@@ -1276,11 +1280,14 @@ static int guiderTelem(int init_struct)
 				for(int ii=1; ii<5; ii++)
 				{
 					strcpy(lfS[ii].label, lfnT[ii].text);
-					IDMessage(mydev, "%s %s", lfS[ii].label, lfnT[ii].text);
 					sprintf(lower_name, "LF%iS", ii);
-					IUFillSwitch(&lfS[ii], lower_name, lfnT[ii].text, lfS[ii].s);
+					//IUFillSwitch(&lfS[ii], lower_name, lfnT[ii].text, lfS[ii].s);
 				}
-					
+				if( !motor->isHomed)
+				{
+					lfSP.s = IPS_BUSY;
+				}
+						
 			}
 			IDSetSwitch(&lfSP, NULL);
 
@@ -1298,6 +1305,12 @@ static int guiderTelem(int init_struct)
 				IUResetSwitch(&ufSP);
 				ufS[motor->fnum].s = ISS_ON;
 				ufSP.s = IPS_OK;	
+				
+				if( !motor->isHomed)
+				{
+					ufSP.s = IPS_BUSY;
+				}
+
 			}
 			IDSetSwitch(&ufSP, NULL);	
 	
@@ -1343,7 +1356,7 @@ static int guiderTelem(int init_struct)
 			{
 				mirr_posS[0].s = ISS_ON;
 			}
-			else if(( 1.0 < motor->pos*ENCODER2MM) && (motor->pos*ENCODER2MM < 4.0 ) )
+			else if(( 2.0 < motor->pos*ENCODER2MM) && (motor->pos*ENCODER2MM < 4.0 ) )
 			{
 				mirr_posS[1].s = ISS_ON;
 			}
@@ -1351,7 +1364,12 @@ static int guiderTelem(int init_struct)
 			{
 				mirr_posS[1].s = ISS_ON;
 			}
+
 			if(motor->isMoving)
+			{
+				mirr_posSP.s = IPS_BUSY;
+			}
+			else if(!motor->isHomed)
 			{
 				mirr_posSP.s = IPS_BUSY;
 			}

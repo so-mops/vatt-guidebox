@@ -740,27 +740,38 @@ int moog_getallstatus_quick(int rs485_fd, MSTATUS motors[])
 	int wc, active;
 	static int foo = 0;
 	int motor_count=0;
-	moog_read(rs485_fd, resp);//Flush the line
+	char msg[10];
 
-	/* Something is causing the motors to not respond
-	 * when this happens we call the serialfix. At first
-	 * we were only doing this when the connection was
-	 * oponed. We are having a problem with the current
-	 * INDI driver where the motor does this a lot more
-	 * hopefully this is a temporary fix while we leave
-	 * find the cause of the motors not responding. 
-	 * --Scott 10/2019
-	 * */
+
+	moog_read(rs485_fd, resp);//Flush the line
+	snprintf(msg, 10, "RW(12)");
+	moog_write(rs485_fd, (const char *) msg );
+
+	if( moog_read(rs485_fd, resp) == 0)
+	{
+		active = atoi(resp);
+	}
+	else
+	{
+		fprintf(stderr, "WE could not get active status\n");
+		return -1;
+	}
+
+
 	moog_callsub( rs485_fd, 998, -1);
+
+
+	usleep(500000);
 	while(motor_num <7 )
 	{
+		
 		moog_read(rs485_fd, resp);
 		wc = sscanf(resp, "%i %i %i %i %i %i %i %i %i", &motor_num, &pos, &f, &w0, &w1, &w2, &w3, &userbits, &iobits );
-		//fprintf(stderr, "[%s]\n", resp );
 		if (wc != 9)
 		{
-			fprintf(stderr, "[%s]\n", resp );
-			moog_serialfix(rs485_fd);
+			fprintf(stderr, "bad\n" );
+			//fprintf(stderr, "[%s]\n", resp );
+			//moog_serialfix(rs485_fd);
 			continue;
 		}
 		else
@@ -780,12 +791,11 @@ int moog_getallstatus_quick(int rs485_fd, MSTATUS motors[])
 				motor->words[3] = w3;
 				motor->userbits = userbits;
 				motor->iobits = iobits;
-				motor->isActive = 1;
+				motor->isActive = (1<<motor->motor_num) & active;
 				motor->inPosLimit = w0 & (1<<16);
 				motor->inNegLimit = w0 & (1<<15);
 				motor->isMoving = w0 & (1<<2);
 				motor->isHomed = userbits & 1;
-				active = (1<<motor->motor_num) | active;
 				motor_count++;
 			}
 		}
@@ -794,7 +804,7 @@ int moog_getallstatus_quick(int rs485_fd, MSTATUS motors[])
 	if(motor_count != 7)
 	{
 		
-		fprintf(stderr, "We are missing motors\n");
+		//fprintf(stderr, "We are missing motors\n");
 	}
 	return active;
 }
