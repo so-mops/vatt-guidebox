@@ -71,6 +71,7 @@ typedef enum{
 
 int RS485_FD;
 int inited;
+int polling=0;
 
 
 static void gbIndiInit();
@@ -136,7 +137,7 @@ static ISwitchVectorProperty engSwitchSP = {mydev, "Switches", "Switches", ENG_G
 Group:  MAIN
 ************************************************/
 //guider actions
-static ISwitch actionS[]  = {{"INITIALIZE",  "Initialize",  ISS_OFF, 0, 0},{"HOME",  "Reference (Home)",  ISS_OFF, 0, 0}};
+static ISwitch actionS[]  = {{"INITIALIZE",  "Initialize",  ISS_OFF, 0, 0},{"HOME",  "Reference",  ISS_OFF, 0, 0}};
 
 ISwitchVectorProperty actionSP      = { mydev, "GUIDE_BOX_ACTIONS", "Guide Box Actions",  MAIN_GROUP, IP_RW, ISR_NOFMANY, 0, IPS_IDLE,  actionS, NARRAY(actionS), "", 0 };
 
@@ -408,7 +409,6 @@ char rawCmdString[50];
 		//connectS[0].s = ISS_ON;
 		//connectS[1].s = ISS_OFF;
 		//connectDome();
-		IDSetSwitch (&connectSP, "Guider is connected.");
 	}
          
  }
@@ -673,7 +673,8 @@ ISState state;
 int isDifferent;
 char respbuffer[50];
 char L, F, S;
-int fnum;
+int fnum, init_struct=1;
+
 
 	/* ignore if not ours */
 	if (strcmp (dev, mydev))
@@ -732,22 +733,52 @@ int fnum;
 				//sp->s = states[0];
 				connectS[0].s = ISS_ON;
 				//connectS[1].s = ISS_OFF;
-				IDMessage(mydev, "networkT[0].text=%s", networkT[0].text);
 				if (gcomtype == NET)
+				{
 					RS485_FD = net_ttyOpen(networkT[0].text);
+					IDMessage(mydev, "networkT[0].text=%s", networkT[0].text);
+				}
 				else
+				{
 					RS485_FD = ttyOpen(ttyPortT[0].text);
+				}
+
 				if (RS485_FD > 0)
 				{
 					connectS[0].s = ISS_ON;
-					//connectS[1].s = ISS_OFF;
 					connectSP.s = IPS_OK;
-					IDSetSwitch (&connectSP, "Guider is connected.");
-					if(actionS[0].s == ISS_OFF)
+					IDSetSwitch (&connectSP, NULL);
+					moog_write(RS485_FD, "Rxxx");
+
+					if( moog_read(RS485_FD, ret ) == 0 )
+					{//check if the head node has been initialized.
+						if(atoi(ret) != MOOG_INITIALIZED)
+						{// if not initialize. This will loose the home position.
+
+							IDMessage(mydev, "Guidebox is not initialized.");
+							IDMessage(mydev, "Initializing.");
+							gbIndiInit( );
+						}
+						else
+						{
+							IDMessage(mydev, "Guidebox is initialized.");
+						}
+
+					}
+					else
 					{
-						//gbIndiInit(  );
-						actionS[0].s = ISS_ON;
-						IDSetSwitch(&actionSP, "Initializing guider.");
+						IDMessage(mydev, "Guidebox did not respond to init status check.");
+						IDMessage(mydev, "Initializing.");
+						gbIndiInit( );
+					}
+						
+
+					//if the motors don't respond try initializing.
+					
+
+         				if(!polling)
+					{
+						IEAddTimer (POLLMS, guiderProc, &init_struct);
 					}
 				}
 				else
@@ -765,6 +796,44 @@ int fnum;
 				connectS[0].s = ISS_OFF;
 				connectSP.s = IPS_IDLE;
 				IDSetSwitch(&connectSP, "Disconnecting Guider");
+
+
+				ufwNPR.s = IPS_IDLE;
+				IDSetNumber(&ufwNPR, NULL);
+
+				lfwNPR.s = IPS_IDLE;
+				IDSetNumber(&lfwNPR, NULL);
+
+				offxNPR.s = IPS_IDLE;
+				IDSetNumber(&offxNPR, NULL);
+
+				offyNPR.s = IPS_IDLE;
+				IDSetNumber(&offyNPR, NULL);
+
+				offFocNPR.s = IPS_IDLE;
+				IDSetNumber(&offFocNPR, NULL);
+
+				offMirrNPR.s = IPS_IDLE;
+				IDSetNumber(&offMirrNPR, NULL);
+
+				ofwNPR.s = IPS_IDLE;
+				IDSetNumber(&ofwNPR, NULL);
+
+				lfSP.s = IPS_IDLE;
+				IDSetSwitch(&lfSP, NULL);
+
+				ufSP.s = IPS_IDLE;
+				IDSetSwitch(&ufSP, NULL);
+
+				mirr_posSP.s = IPS_IDLE;
+				IDSetSwitch(&mirr_posSP, NULL);
+
+				gfSP.s = IPS_IDLE;
+				IDSetSwitch(&gfSP, NULL);
+
+				actionSP.s = IPS_IDLE;
+				IDSetSwitch(&actionSP, NULL);
+
 			}		
 
 
@@ -808,8 +877,6 @@ int fnum;
 
 				}
 			}
-			
-			 
 			/*  home  */ 
 			else if (sp == &actionS[1]) 
 			{
@@ -1011,7 +1078,6 @@ int fnum;
 
 	/* start timer to simulate mount motion
             The timer will call function mountSim after POLLMS milliseconds */
-         IEAddTimer (POLLMS, guiderProc, &init_struct);
 	
          inited = 1;
          
@@ -1181,7 +1247,6 @@ static int guiderTelem(int init_struct)
 			if(motor->isActive)
 				allHomed=0;
 		}
-		IDMessage(mydev, "%s isActive? %i", motor->name, motor->isActive);
 		if ( motor->isActive )
 		{/*motor->isActive tells us weather the head node was able to communicate with 
 		 motor over the can bus.*/
@@ -1280,8 +1345,6 @@ static int guiderTelem(int init_struct)
 				for(int ii=1; ii<5; ii++)
 				{
 					strcpy(lfS[ii].label, lfnT[ii].text);
-					sprintf(lower_name, "LF%iS", ii);
-					//IUFillSwitch(&lfS[ii], lower_name, lfnT[ii].text, lfS[ii].s);
 				}
 				if( !motor->isHomed)
 				{
@@ -1305,7 +1368,11 @@ static int guiderTelem(int init_struct)
 				IUResetSwitch(&ufSP);
 				ufS[motor->fnum].s = ISS_ON;
 				ufSP.s = IPS_OK;	
-				
+				for(int ii=1; ii<5; ii++)
+				{
+					strcpy(ufS[ii].label, ufnT[ii].text);
+				}
+
 				if( !motor->isHomed)
 				{
 					ufSP.s = IPS_BUSY;
@@ -1439,18 +1506,20 @@ void guiderProc (void *p)
 
     if(p != NULL)// we only need to init the allmotors struct once.
 	{
-		//IDMessage(mydev, "INITING STRUCT");
 		init_struct=1;
 	}
 	else
+	{
 		init_struct=0;
+	}
 
 	//fprintf(stderr, "in guider proc\n");
-	/* If telescope is not on, do not query.  just start */
+	/* If guidebox is not on, do not query.  just start */
          if (connectSP.s == IPS_IDLE)
          {
-                 IEAddTimer (POLLMS, guiderProc, NULL);
-                 return;
+	 	polling=1;
+		IEAddTimer (POLLMS, guiderProc, NULL);
+		return;
          }
  
 	  /* Process per current state.*/
@@ -1478,6 +1547,7 @@ void guiderProc (void *p)
          }
  
          /* again */
+	 polling=1;
          IEAddTimer (POLLMS, guiderProc, NULL);
  }
  

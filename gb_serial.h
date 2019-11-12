@@ -11,6 +11,12 @@
 #define SENDSIZE 100
 #define READSIZE 1000
 
+//If the variable xxx is 7
+//on the moog motor then we
+//know the start up subroutine (C1)
+//has finished 
+#define MOOG_INITIALIZED 7
+
 typedef struct 
 {
 	int words[4]; //status words
