@@ -10,6 +10,7 @@
 
 #define SENDSIZE 100
 #define READSIZE 1000
+#define NMOTORS 7
 
 //If the variable xxx is 7
 //on the moog motor then we

@@ -39,6 +39,7 @@
 #define MAIN_GROUP	"Guider Control"                  /* Group name */
 #define ENG_GROUP	"Engineering"
 #define qrydev	 	"FILTERS"
+#define logdev	 	"LOGGER"
 
 #define MOT1_GROUP "MOTOR 1 Eng"
 #define MOT2_GROUP "MOTOR 2 Eng"
@@ -74,6 +75,8 @@ int inited;
 int polling=0;
 
 
+
+
 static void gbIndiInit();
 static void zeroTelem();
 void guiderProc (void *p);
@@ -85,11 +88,12 @@ static int loadFNames(char *, char[5][20]);
 static int getCurrentFilters(char *, char *);
 static void defMotors();
 static void defWheels();
+static void printAllmotors();
 
 //global memory for IText properties
 char gttyPORT[20];
 char gnetwork[20];
-char gstatusString[7][1000];
+char gstatusString[NMOTORS][1000];
 int gcomtype;
 
 // main connection switch
@@ -312,7 +316,7 @@ typedef struct _INDIMOTOR
 //The structures in this array are filled
 //in the fillmotors function.
 
-INDIMOTOR indi_motors[7];
+INDIMOTOR indi_motors[NMOTORS];
 
 static IText rawCmdT[] = {{"RAWCMD", "Raw Command", "Response Here", 0, 0, 0}};
 static ITextVectorProperty rawCmdTP = {mydev, "RAWCMD", "Raw Command", ENG_GROUP, IP_RW, 0, IPS_IDLE, rawCmdT, NARRAY(rawCmdT) };
@@ -455,10 +459,6 @@ char rawCmdString[50];
 			//gb_commands if we are trying to stay away from
 			//directo moog_* class.
 			//
-			//TODO: for someone reason I cant seem
-			//to get variables back from the drives
-			//eg. Rqq should respone with integer in
-			//qq but I never see a response
 			IDMessage(mydev, "WRITING...");
 			moog_write( RS485_FD, texts[0] );
 			usleep(50000);
@@ -1022,7 +1022,7 @@ int fnum, init_struct=1;
 	}
 	else
 	{// This is the motor specific engineering tools
-		for ( INDIMOTOR *imotor=indi_motors; imotor!=indi_motors+7; imotor++ )
+		for ( INDIMOTOR *imotor=indi_motors; imotor!=indi_motors+NMOTORS; imotor++ )
 		{
 			if( !strcmp(name, imotor->engSwitchesSP.name) )
 			{
@@ -1155,7 +1155,7 @@ static int guiderTelem(int init_struct)
 	int fwheel_upper_isOff, fwheel_lower_isOff;
 	int  err, ix, isFilter, active, allHomed=1;
 	double num;
-	static MSTATUS allmotors[7];
+	static MSTATUS allmotors[NMOTORS];
 	static int solenoid_status=OFF;
 	static int last_solenoid_status=OFF;
 	INumber *indinum;
@@ -1188,7 +1188,7 @@ static int guiderTelem(int init_struct)
 	int head_node;
 	if(init_struct)
 	{
-		memset(allmotors,0,(sizeof(MSTATUS)*7));
+		memset(allmotors,0,(sizeof(MSTATUS)*NMOTORS));
 	}
 
 	//TODO: we need some more error checking on doTelemetry. 
@@ -1206,7 +1206,7 @@ static int guiderTelem(int init_struct)
 
 	//Iterate through the allmotors array so we can populate 
 	//indi fields.
-	for(MSTATUS *motor=allmotors; motor!=allmotors+7; motor++)
+	for(MSTATUS *motor=allmotors; motor!=allmotors+NMOTORS; motor++)
 	{
 		if(init_struct)
 		{
@@ -1223,7 +1223,7 @@ static int guiderTelem(int init_struct)
 				IDSetText( &head_nodeTP, NULL );
 			}
 		}
-
+		IDMessage(mydev, "%s %i %i", motor->name, motor->neg_slimit, motor->pos_slimit);
 		//motor2nvp uses the motor->name to 
 		//grab the correct number vector property
 		//where we will display the position or 
@@ -1552,7 +1552,20 @@ void guiderProc (void *p)
  }
  
 
-
+/******************************************************
+ * Name: fillMotors
+ * Description: 
+ * 	Populate the indi_motors array of structs
+ *	with default values. I beleieve all of this
+ *	information is hidden from the average user.
+ *	It is mostly used for engineering.
+ *	This is mostly done with the IUFill* family 
+ *	of functions
+ *
+ *	Scott Swindell Nov 2019
+ *
+ *
+ * ****************************************************/
 static void fillMotors()
 {
 	char name[20];
@@ -1601,7 +1614,7 @@ static void fillMotors()
 		}
 	};
 	
-	for(INDIMOTOR *imotor=indi_motors; imotor!=indi_motors+7; imotor++)
+	for(INDIMOTOR *imotor=indi_motors; imotor!=indi_motors+NMOTORS; imotor++)
 	{
 
 		snprintf( group, 20, "Motor %i Eng", motor_num );
@@ -1679,11 +1692,22 @@ static void fillMotors()
 }
 
 
-
+/*****************************************************
+ * Name: defMotors
+ * Description:
+ * 	iterate through the motors and call the IDDef*
+ * 	family of functions. This sends the initial
+ * 	definition of the INDI vector properties. 
+ *
+ *
+ *	Scott Swindell Nov. 2019
+ *
+ *
+ * ************************************************/
 static void defMotors()
 {
 
-	for(INDIMOTOR *imotor=indi_motors; imotor!=indi_motors+7; imotor++)
+	for(INDIMOTOR *imotor=indi_motors; imotor!=indi_motors+NMOTORS; imotor++)
 	{
 		IDDefSwitch(&imotor->engSwitchesSP, NULL);
 		//IDDefText(&imotor->nameTP, NULL);
@@ -1740,6 +1764,19 @@ static void fillFWheels()
 }
 
 
+/*****************************************************
+ * Name: defWheels
+ * Description:
+ * 	iterate through the filter wheels and call the IDDef*
+ * 	family of functions. This sends the initial
+ * 	definition of the INDI vector properties. 
+ *
+ *
+ *	Scott Swindell Nov. 2019
+ *
+ *
+ * ************************************************/
+
 static void defWheels()
 {
 	for(int ii=0; ii<5; ii++)
@@ -1750,27 +1787,13 @@ static void defWheels()
 	}
 }
 
+
 double focus_trans(double x, double y)
 {
 	double r = sqrt(x*x + y*y);
 	return  33.325*r*r - 0.0063*r + 0.0012;
 }
 
-/*
-TODO:
-The following two functions are a means of 
-saving the filter names to a file so that 
-they can be retrieved when the driver is restarted.
-These function rely on scanf and assume a whitespace
-separated functions. Unfortunately, there is nothing 
-to keep the user from using whitespace in the name
-of the filters. I would instead opt for comma separated
-values or use some other delimiter. Alas, I am running 
-out of time and I have other things to do. Maybe on 
-the next iteration
-
-Scott Swindell 10/2019
-*/
 static int saveFNames(char *wheel, char *name, char *fnum)
 {
 	char saved_filters[200];
@@ -1899,5 +1922,6 @@ static int getCurrentFilters(char *upper, char *lower)
 		strcpy(lower, "IDK");
 
 }
+
 
 
