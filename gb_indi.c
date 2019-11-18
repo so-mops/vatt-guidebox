@@ -431,7 +431,6 @@ char rawCmdString[50];
  void ISNewText (const char *dev, const char *name, char *texts[], char *names[], int n)
  {
 
-	//IDMessage(mydev, "ISNewText called %s [%s], %li", name, texts[0], sizeof(texts[0]));
 	char septext[30];
 	char respbuff[100];
 
@@ -526,11 +525,12 @@ char rawCmdString[50];
 #
 #############################################################################*/
  void ISNewNumber (const char *dev, const char *name, double values[], char *names[], int n)
- { int err; char ret[100];
-          
+ { 
+	int err; char ret[100];
+	double xmm, ymm, focusmm, delta_focusmm;
          /* ignore if not ours */
-         if (strcmp (dev, mydev))
-             return;
+	if (strcmp (dev, mydev))
+		return;
  
 
 
@@ -559,7 +559,12 @@ char rawCmdString[50];
                  IDSetNumber(&offxNPR, "Guider is offline.");
                  return;
              }
-             
+
+             xmm = offxNPR.np.value[0];
+             ymm = offyNPR.np.value[0];
+	     delta_focusmm = focus_trans(xmm+values[0], ymm) - focus_trans(xmm, ymm);
+	     focusmm = offFocNPR.np.value[0];
+             //stageGoTo(RS485_FD, offFocNPR.name, (int)((focusmm+delta_focusmm)/ENCODER2MM));
              stageGoTo(RS485_FD, offxNPR.name, (int)((values[0]+XOFFSET)/ENCODER2MM));
 	
 	     offxNPR.s = IPS_IDLE;
@@ -574,7 +579,14 @@ char rawCmdString[50];
                  offyNPR.s = IPS_IDLE;
                  IDSetNumber(&offyNPR, "Guider is offline.");
                  return;
-             }
+             } 
+ 
+	     xmm = offxNPR.np.value[0];
+             ymm = offyNPR.np.value[0];
+	     delta_focusmm = focus_trans(xmm, ymm+values[0]) - focus_trans(xmm, ymm);
+	     focusmm = offFocNPR.np.value[0];
+             //stageGoTo(RS485_FD, offFocNPR.name, (int)((focusmm+delta_focusmm)/ENCODER2MM));
+
              //TODO check which mirros is in.
              stageGoTo(RS485_FD, offyNPR.name, (int)((values[0]+YOFFSET)/ENCODER2MM));
 	
@@ -1223,13 +1235,11 @@ static int guiderTelem(int init_struct)
 				IDSetText( &head_nodeTP, NULL );
 			}
 		}
-		IDMessage(mydev, "%s %i %i", motor->name, motor->neg_slimit, motor->pos_slimit);
+
 		//motor2nvp uses the motor->name to 
 		//grab the correct number vector property
 		//where we will display the position or 
-		//filternumber of each axis. Populating this 
-		//is 99% of what the user should see and use.
-		//The rest of the stuff is for engineering purposes
+		//filternumber of each axis. 	
 		
 		pNVP = motor2nvp(motor);
 		//IDMessage(mydev, "%s %i %i %i", motor->name, motor->words[0], motor->words[1], motor->userbits);
@@ -1247,6 +1257,7 @@ static int guiderTelem(int init_struct)
 			if(motor->isActive)
 				allHomed=0;
 		}
+
 		if ( motor->isActive )
 		{/*motor->isActive tells us weather the head node was able to communicate with 
 		 motor over the can bus.*/
@@ -1717,6 +1728,19 @@ static void defMotors()
 	}
 }
 
+
+/******************************************************
+ * Name: fillMotors
+ * Description: 
+ * 	Populate the indi_motors array of structs
+ *	with default values.  
+ *	This is done with the IUFill* family 
+ *	of functions
+ *
+ *	Scott Swindell Nov 2019
+ *
+ *
+ * ****************************************************/
 static void fillFWheels()
 {
 		//TODO should probably be in a config file
@@ -1793,6 +1817,7 @@ double focus_trans(double x, double y)
 	double r = sqrt(x*x + y*y);
 	return  33.325*r*r - 0.0063*r + 0.0012;
 }
+
 
 static int saveFNames(char *wheel, char *name, char *fnum)
 {
