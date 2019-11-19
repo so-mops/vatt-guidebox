@@ -973,7 +973,10 @@ C410 ' Retract the solenoid
 	IF CADDR != FWHEEL_UPPER
 		END
 	ENDIF
+	'Turn on solenoid sensor
 	OS(7) OS(8)
+
+	' Retract the solenoid
 	OS(9)
 	WAIT=100
 	WHILE IN(6) == 0
