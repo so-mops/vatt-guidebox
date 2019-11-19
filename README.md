@@ -11,23 +11,23 @@ The motors communicate with the outside world via an RS485 serial line connected
 
 
 
-### Control Software (allmotors.sms)
+## Control Software (allmotors.sms)
 The control software (allmotors.sms) runs on the new Moog Animatics Class 5 M style SmartMotors. It was written using the [SmartMotor Interface software](https://www.animatics.com/products/software/smi-smartmotor-interface). It is a basic-like language that has a very simple and easy to learn syntax. For simplicity and interchangeablitly each motor has the same version of firmware flashed onto it. The program differentiates its behavior based on the CAN address of the motor. This is very important because if a motor is placed is given an incorrect address it can cause damage. For language specifics and anything else you might want to know about the control software refer the [the developers guide ](https://www.animatics.com/downloads/top%20level/4.%20Manuals/c.%20Programming%20Information%20and%20Command%20Reference/SmartMotor%20Developers%20Guide.pdf)
 
 The control program is broken into subroutines that are labeled with C<NUM> where <NUM> is an integer used to name the subroutine. You call the subroutines with the GOSUB(<NUM>) command. When a motor starts up it waits for the head node to call its C1 subroutine. When the head node is started, it waits for the user to call its C0 subroutine. C0 puts in place all the necessary settings like homing position and accel/decel rates. The head node is defined as the motor connected with the RS485 serial line. 
   
   
 
-### Motor Communication Software (gb_serial.c)
+## Motor Communication Software (gb_serial.c)
 This module facilitates the low level communication with the motors. It has convenience functions for anything one would want to do with the guidebox. This includes subroutine calls, initialization, homing, goto and telemetry streaming. 
 
 
-### INDI Driver (gb_serial.c)
+## INDI Driver (gb_serial.c)
 The INDI driver is built with [indilib](https://indilib.org/) though it uses an older C based version of the library and not the C++ version built by Jasem Mutlaq. 
 
 
 
-### Current Implementation at VATT
+## Current Implementation at VATT
 The user interface for this software is the [INDI webclient](https://github.com/srswinde/indi_webclient). The webclient displays the INDI vector properties from the gb_indi.c in a web page. There is a VATT4K version, a VATTSPEC version and an  engineering version. The INDI driver and indi client are started at the system boot using an enabled systemd service. You can see the [Unit file here](https://github.com/srswinde/indi_webclient/blob/master/systemd/webclient-compose.service). You can start, stop or reload this service using the service command or the systemctl command. 
 
 The systemd service uses docker-compose to run three different docker contianers:
@@ -39,7 +39,7 @@ The docker-compose yml file is [here](https://github.com/srswinde/indi_webclient
 
 **Note: this driver runs inside the indihex docker to combine the drivers under one indiserver. Otherwise we would need separate instances of indiserver to run the secondary hexapod and this indi driver.**
 
-### User Bits
+## User Bits
 User Bits are user defined bits on word 12 of the SmartMotor set of information bits. The allmotors.sms defines them thusly:
 
 
@@ -57,7 +57,7 @@ User Bits are user defined bits on word 12 of the SmartMotor set of information 
 | Bit 12   | Motor Ready    | RB(12,12)    | All Motors     |
 
 
-### IO definitions and other motor specefics:
+## IO definitions and other motor specefics:
 
 ### OFFSET_X (CAN ADDRESS 1)
 
