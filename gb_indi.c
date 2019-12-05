@@ -89,6 +89,7 @@ static int getCurrentFilters(char *, char *);
 static void defMotors();
 static void defWheels();
 static void printAllmotors();
+double focus_trans(double, double);
 
 //global memory for IText properties
 char gttyPORT[20];
@@ -98,10 +99,10 @@ int gcomtype;
 
 // main connection switch
 static ISwitch connectS[] = {
-	   {"CONNECT",  "Connect",  ISS_OFF, 0, 0}
-     //{"CONNECT",  "On",  ISS_OFF, 0, 0}, {"DISCONNECT", "Off", ISS_ON, 0, 0}
+	//   {"CONNECT",  "Connect",  ISS_OFF, 0, 0}
+     {"CONNECT",  "Connect",  ISS_OFF, 0, 0}, {"DISCONNECT", "Disconnect", ISS_ON, 0, 0}
 	 };
-static ISwitchVectorProperty connectSP = { mydev, "CONNECTION", "Connection",  MAIN_GROUP, IP_RW, ISR_NOFMANY, 0, IPS_IDLE,  connectS, NARRAY(connectS), "", 0 };
+static ISwitchVectorProperty connectSP = { mydev, "CONNECTION", "Connection",  MAIN_GROUP, IP_RW, ISR_1OFMANY, 0, IPS_IDLE,  connectS, NARRAY(connectS), "", 0 };
  
 static ISwitch getdataS[] = {
 	{"GETDATA",  "Get Data",  ISS_OFF, 0, 0}
@@ -158,17 +159,17 @@ static INumber lfwNR[] = {{"FWHEEL_LOWER","Lower Filter", "%f",0., 0., 0., 0., 0
  static INumberVectorProperty lfwNPR = {  mydev, "FWHEEL_LOWER", "Lower Filter Wheel goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  lfwNR, NARRAY(lfwNR), "", 0};
 
 //Offset X Goto
-static INumber offxNR[] = {{"OFFSET_X","Offset X Position", "%5.2f",0., 0., 0., 0., 0, 0, 0}, };
+static INumber offxNR[] = {{"OFFSET_X","Offset X", "%5.2f",0., 0., 0., 0., 0, 0, 0}, };
 
  static INumberVectorProperty offxNPR = {  mydev, "OFFSET_X", "offset x goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  offxNR, NARRAY(offxNR), "", 0};
 
 //Offset Y Goto
-static INumber offyNR[] = {{"OFFSET_Y","Offset Y Position", "%5.2f",0., 0., 0., 0., 0, 0, 0}, };
+static INumber offyNR[] = {{"OFFSET_Y","Offset Y", "%5.2f",0., 0., 0., 0., 0, 0, 0}, };
 
  static INumberVectorProperty offyNPR = {  mydev, "OFFSET_Y", "offset y goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  offyNR, NARRAY(offyNR), "", 0};
 
 //Offset Focus Goto
-static INumber offFocNR[] = {{"OFFSET_FOCUS","Offset Focus", "%5.2f",0., 0., 0., 0., 0, 0, 0}, };
+static INumber offFocNR[] = {{"OFFSET_FOCUS","Focus", "%5.2f",0., 0., 0., 0., 0, 0, 0}, };
 
  static INumberVectorProperty offFocNPR = {  mydev, "OFFSET_FOCUS", "offset foc goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  offFocNR, NARRAY(offFocNR), "", 0};
 
@@ -207,7 +208,9 @@ static IText head_nodeT[] = {{"HEAD", "Head Motor Node", "IDK?", 0, 0, 0}};
 static char head_nodeString[20];
 static ITextVectorProperty head_nodeTP = { mydev, "HEAD", "Head Motor Node", ENG_GROUP , IP_RO, 0, IPS_IDLE,  head_nodeT, NARRAY(head_nodeT), "", 0};
 
-
+//Auto Focus Button
+static ISwitch autoFocusS[1] = {{"AUTOFOC", "Auto Focus", ISS_OFF, 0, 0}};
+static ISwitchVectorProperty autoFocusSP = {mydev, "AUTOFOC", "", MAIN_GROUP, IP_RW, ISR_NOFMANY, 0, IPS_IDLE, autoFocusS, NARRAY(autoFocusS), "", 0};
 
 //Filter wheel buttons
 static ISwitch lfS[5];
@@ -387,6 +390,8 @@ char rawCmdString[50];
 	IDDefSwitch(&serialfixSP, NULL);
 	IDDefSwitch(&mirr_posSP, NULL);
 
+	IDDefSwitch(&autoFocusSP, NULL);
+
 	IDDefText(&head_nodeTP, NULL);
 
 	defMotors();
@@ -560,11 +565,16 @@ char rawCmdString[50];
                  return;
              }
 
-             xmm = offxNPR.np.value[0];
-             ymm = offyNPR.np.value[0];
-	     delta_focusmm = focus_trans(xmm+values[0], ymm) - focus_trans(xmm, ymm);
-	     focusmm = offFocNPR.np.value[0];
-             //stageGoTo(RS485_FD, offFocNPR.name, (int)((focusmm+delta_focusmm)/ENCODER2MM));
+             xmm = offxNPR.np[0].value;
+             ymm = offyNPR.np[0].value;
+	     delta_focusmm = focus_trans(values[0], ymm) - focus_trans(xmm, ymm);
+	     focusmm = offFocNPR.np[0].value;
+	     IDMessage(mydev, "New focus position %f %f %f %f %f %f", values[0], xmm, ymm, focusmm, delta_focusmm, (focusmm+delta_focusmm));
+
+	     if(autoFocusS[0].s == ISS_ON)
+	     {
+             	stageGoTo(RS485_FD, offFocNPR.name, (int)((focusmm+delta_focusmm)/ENCODER2MM));
+	     }
              stageGoTo(RS485_FD, offxNPR.name, (int)((values[0]+XOFFSET)/ENCODER2MM));
 	
 	     offxNPR.s = IPS_IDLE;
@@ -581,11 +591,15 @@ char rawCmdString[50];
                  return;
              } 
  
-	     xmm = offxNPR.np.value[0];
-             ymm = offyNPR.np.value[0];
-	     delta_focusmm = focus_trans(xmm, ymm+values[0]) - focus_trans(xmm, ymm);
-	     focusmm = offFocNPR.np.value[0];
-             //stageGoTo(RS485_FD, offFocNPR.name, (int)((focusmm+delta_focusmm)/ENCODER2MM));
+	     xmm = offxNPR.np[0].value;
+             ymm = offyNPR.np[0].value;
+	     delta_focusmm = focus_trans(xmm, values[0]) - focus_trans(xmm, ymm);
+	     IDMessage(mydev, "New focus position %f", (focusmm+delta_focusmm));
+	     focusmm = offFocNPR.np[0].value;
+	     if(autoFocusS[0].s == ISS_ON)
+	     {
+             	stageGoTo(RS485_FD, offFocNPR.name, (int)((focusmm+delta_focusmm)/ENCODER2MM));
+	     }
 
              //TODO check which mirros is in.
              stageGoTo(RS485_FD, offyNPR.name, (int)((values[0]+YOFFSET)/ENCODER2MM));
@@ -811,7 +825,7 @@ int fnum, init_struct=1;
 
 
 				ufwNPR.s = IPS_IDLE;
-				IDSetNumber(&ufwNPR, NULL);
+				IDSetNumber(&ufwNPR, "DID THIS HAPPEN??");
 
 				lfwNPR.s = IPS_IDLE;
 				IDSetNumber(&lfwNPR, NULL);
@@ -852,7 +866,53 @@ int fnum, init_struct=1;
 		}
 		else
 		{
+			
 			//if(connectS[0].s == ISS_OFF){return;}//hack so code wont run twice
+			if(states[0] == ISS_ON)
+			{
+				ttyClose(RS485_FD);
+				connectSP.s = IPS_IDLE;
+				IDSetSwitch(&connectSP, "Disconnecting Guider");
+
+
+				ufwNPR.s = IPS_IDLE;
+				IDSetNumber(&ufwNPR, NULL);
+
+				lfwNPR.s = IPS_IDLE;
+				IDSetNumber(&lfwNPR, NULL);
+
+				offxNPR.s = IPS_IDLE;
+				IDSetNumber(&offxNPR, NULL);
+
+				offyNPR.s = IPS_IDLE;
+				IDSetNumber(&offyNPR, NULL);
+
+				offFocNPR.s = IPS_IDLE;
+				IDSetNumber(&offFocNPR, NULL);
+
+				offMirrNPR.s = IPS_IDLE;
+				IDSetNumber(&offMirrNPR, NULL);
+
+				ofwNPR.s = IPS_IDLE;
+				IDSetNumber(&ofwNPR, NULL);
+
+				lfSP.s = IPS_IDLE;
+				IDSetSwitch(&lfSP, NULL);
+
+				ufSP.s = IPS_IDLE;
+				IDSetSwitch(&ufSP, NULL);
+
+				mirr_posSP.s = IPS_IDLE;
+				IDSetSwitch(&mirr_posSP, NULL);
+
+				gfSP.s = IPS_IDLE;
+				IDSetSwitch(&gfSP, NULL);
+
+				actionSP.s = IPS_IDLE;
+				IDSetSwitch(&actionSP, NULL);
+
+
+			}
 			IUResetSwitch(&connectSP);
 			//sp->s = states[1];
 			connectS[0].s = ISS_OFF;
@@ -1031,6 +1091,28 @@ int fnum, init_struct=1;
 		moog_serialfix(RS485_FD);
 		IUResetSwitch(&serialfixSP);
 		IDSetSwitch(&serialfixSP, "Sent Serial Fix");
+	}
+	else if( !strcmp(name, autoFocusSP.name))
+	{
+		if(connectS[0].s == ISS_OFF)
+		{//we aren't connected.
+			autoFocusS[0].s = ISS_OFF;
+			IDSetSwitch(&autoFocusSP, NULL);
+			return;
+		}
+
+		if(states[0] == ISS_ON)
+		{
+			autoFocusSP.s=IPS_OK;
+			autoFocusS[0].s = ISS_ON;
+		}
+		else
+		{
+			autoFocusSP.s=IPS_IDLE;
+			autoFocusS[0].s = ISS_OFF;
+		}
+		IDSetSwitch(&autoFocusSP, NULL);
+
 	}
 	else
 	{// This is the motor specific engineering tools
@@ -1811,11 +1893,28 @@ static void defWheels()
 	}
 }
 
-
+/**************************************
+ *Name focus_trans
+ *Description: The focus plane of the guider
+ *	Camera is vary curved. This function
+ *	adjusts for the curvature of the 
+ *	field. The coefficients A, B and C
+ *	where determined experimentally 
+ *	by a Paul Gabor (pgaboer@as.arizona.edu)
+ *	and Daewook Kim ( dkim@optics.arizona.edu)
+ *
+ *
+ *
+ * **************************************/
 double focus_trans(double x, double y)
 {
+
+	double asecs2mm=0.20866666666666667;
 	double r = sqrt(x*x + y*y);
-	return  33.325*r*r - 0.0063*r + 0.0012;
+	double A=33.325*asecs2mm*asecs2mm;
+	double B=0.0063*asecs2mm;
+	double C=0.0012;
+	return (A*r*r - B*r + C)/1000;
 }
 
 
