@@ -1447,7 +1447,7 @@ static int guiderTelem(int init_struct)
 			}
 			IDSetSwitch(&lfSP, NULL);
 
-			fwheel_lower_isOff =motor->words[0] & 2;
+			//fwheel_lower_isOff =motor->words[0] & 2;
 		}
 
 		else if( !strcmp( motor->name, "FWHEEL_UPPER" ) )
@@ -1474,7 +1474,7 @@ static int guiderTelem(int init_struct)
 			}
 			IDSetSwitch(&ufSP, NULL);	
 	
-			fwheel_upper_isOff = motor->words[0] & 2;
+			//fwheel_upper_isOff = motor->words[0] & 2;
 
 		}
 		else if( !strcmp( motor->name, "OFFSET_FWHEEL" ) )
@@ -1557,6 +1557,7 @@ static int guiderTelem(int init_struct)
 	
 	//solenoid sensor stays on due to bug in firmware
 	//we shall fix it here until the firmware is fixed. 
+	/*
 	if(fwheel_lower_isOff && fwheel_upper_isOff)
 	{
 		if( solenoid_status == ON )
@@ -1571,7 +1572,7 @@ static int guiderTelem(int init_struct)
 	{
 		IDMessage(mydev, "FHWEELS ON");
 		solenoid_status = ON;
-	}
+	}*/
 
 	//fprintf(stderr, "in guiderTelem %s\n", allmotors[5].name );
  	return 1;
