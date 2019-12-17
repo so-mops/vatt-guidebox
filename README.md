@@ -12,9 +12,9 @@ The motors communicate with the outside world via an RS485 serial line connected
 
 
 ## Control Software (allmotors.sms)
-The control software (allmotors.sms) runs on the new Moog Animatics Class 5 M style SmartMotors. It was written using the [SmartMotor Interface software](https://www.animatics.com/products/software/smi-smartmotor-interface). It is a basic-like language that has a very simple and easy to learn syntax. For simplicity and interchangeablitly each motor has the same version of firmware flashed onto it. The program differentiates its behavior based on the CAN address of the motor. This is very important because if a motor is given an incorrect address it can cause damage. For language specifics and anything else you might want to know about the control software refer the [the developers guide ](https://www.animatics.com/downloads/top%20level/4.%20Manuals/c.%20Programming%20Information%20and%20Command%20Reference/SmartMotor%20Developers%20Guide.pdf)
+The control software (allmotors.sms) runs on the new Moog Animatics Class 5 M style SmartMotors. It was written using the [SmartMotor Interface software](https://www.animatics.com/products/software/smi-smartmotor-interface). It is a basic-like language that has a very simple and easy to learn syntax. For simplicity and interchangeability each motor has the same version of firmware flashed onto it. The program differentiates its behavior based on the CAN address of the motor. This is very important because if a motor is given an incorrect address it can cause damage. For language specifics and anything else you might want to know about the control software refer the [the developers guide ](https://www.animatics.com/downloads/top%20level/4.%20Manuals/c.%20Programming%20Information%20and%20Command%20Reference/SmartMotor%20Developers%20Guide.pdf)
 
-The control program is broken into subroutines that are labeled with C<NUM> where <NUM> is an integer used to name the subroutine. You call the subroutines with the GOSUB(<NUM>) command. When a motor starts up it waits for the head node to call its C1 subroutine. When the head node is started, it waits for the user to call its C0 subroutine. C0 puts in place all the necessary settings like homing position and accel/decel rates. The head node is defined as the motor connected with the RS485 serial line. 
+The control program is broken into subroutines that are labeled with C<NUM> where <NUM> is an integer used to name the subroutine. You call the subroutines with the GOSUB(<NUM>) command. When a motor starts up it waits for the head node to call its C1 subroutine. When the head node is started, it waits for the user to call its C0 subroutine. C0 puts in place all the necessary settings like homing position and accel/decel rates. The head node is defined as the motor connected with the RS485 serial line. The software flow charts can be found in the [diagrams directory](https://github.com/so-mops/vatt-guidebox/tree/master/diagrams)
   
   
 
@@ -22,7 +22,7 @@ The control program is broken into subroutines that are labeled with C<NUM> wher
 This module facilitates the low level communication with the motors. It has convenience functions for anything one would want to do with the guidebox. This includes subroutine calls, initialization, homing, goto and telemetry streaming. 
 
 
-## INDI Driver (gb_serial.c)
+## INDI Driver (gb_indi.c)
 The INDI driver is built with [indilib](https://indilib.org/) though it uses an older C based version of the library and not the C++ version built by Jasem Mutlaq. 
 
 
