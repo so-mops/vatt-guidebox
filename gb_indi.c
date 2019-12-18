@@ -127,7 +127,7 @@ static ISwitchVectorProperty serialfixSP = { mydev, "SFIX", "FIX",  ENG_GROUP, I
 
 
 
-static IText networkT[] =  {{"NETWORK", "Net", "10.0.3.86:10001", 0, 0, 0}};
+static IText networkT[] =  {{"NETWORK", "Net", "10.0.3.15:4900", 0, 0, 0}};
 static ITextVectorProperty networkTP = {  mydev, "NET", "Guider Network Information",  ENG_GROUP , IP_RW, 0, IPS_IDLE,  networkT, NARRAY(networkT), "", 0};
 
 static IText ttyPortT[] =  {{"TTYport", "TTY Port", "/dev/ttyUSB0", 0, 0, 0}};
@@ -168,10 +168,35 @@ static INumber offyNR[] = {{"OFFSET_Y","Offset Y", "%5.2f",0., 0., 0., 0., 0, 0,
 
  static INumberVectorProperty offyNPR = {  mydev, "OFFSET_Y", "offset y goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  offyNR, NARRAY(offyNR), "", 0};
 
-//Offset Focus Goto
-static INumber offFocNR[] = {{"OFFSET_FOCUS","Focus", "%5.2f",0., 0., 0., 0., 0, 0, 0}, };
 
- static INumberVectorProperty offFocNPR = {  mydev, "OFFSET_FOCUS", "offset foc goto",  MAIN_GROUP , IP_RW, 0, IPS_IDLE,  offFocNR, NARRAY(offFocNR), "", 0};
+
+//Offset Focus Goto
+//
+/*
+ * An unfortunate naming scheme...
+ * The Focus in "OFFSET_FOCUS" refers to the offset guider. This is how we 
+ * refer to the imager guider as opposed to the slit view (spectrogrpha) guider. 
+ * The offFocNR widget is built to change the focus motor position of the offset 
+ * guider. For reasons I won't get into, the position input from the user
+ * is separated into two parts an input position (z) and a user offset (z'). This offset
+ * is completely different from the "OFFSET" term used to differentiate the 
+ * guiders. So, enjoy that future programmers!
+ *
+ * The positon that will be sent to the OFFSET_FOCUS motor will be
+ * p=z+f(x,y)+z'
+ * Where f is the focus_trans function that subtracts the substantial 
+ * curvature of the field and is a function of the x and y positions
+ * of the offset guider. 
+ *
+ * */
+static INumber offFocInputNR[] = {{"USER_POS","Focus", "%5.2f",0., 0., 0., 0., 0, 0, 0},
+				{"USER_OFFSET","User Offset", "%5.2f",0., 0., 0., 0., 0, 0, 0}};
+
+static INumberVectorProperty offFocInputNPR = {  mydev, "FOCUS_INPUT", "Offset Focus GOTO",  MAIN_GROUP , IP_WO, 0, IPS_IDLE,  offFocInputNR, NARRAY(offFocInputNR), "", 0};
+
+static INumber offFocNR[] = {{"OFFSET_FOCUS","Focus", "%5.2f",0., 0., 0., 0., 0, 0, 0}};
+
+static INumberVectorProperty offFocNPR = {  mydev, "OFFSET_FOCUS", "Focus Pos.",  MAIN_GROUP , IP_RO, 0, IPS_IDLE,  offFocNR, NARRAY(offFocNR), "", 0};
 
 //Offset Mirror Goto
 static INumber offMirrNR[] = {{"OFFSET_MIRRORS","Offset Mirror Position", "%5.2f",0., 90., 0., 0., 0, 0, 0}, };
@@ -209,7 +234,7 @@ static char head_nodeString[20];
 static ITextVectorProperty head_nodeTP = { mydev, "HEAD", "Head Motor Node", ENG_GROUP , IP_RO, 0, IPS_IDLE,  head_nodeT, NARRAY(head_nodeT), "", 0};
 
 //Auto Focus Button
-static ISwitch autoFocusS[1] = {{"AUTOFOC", "Auto Focus", ISS_OFF, 0, 0}};
+static ISwitch autoFocusS[1] = {{"AUTOFOC", "Foc Field Curve", ISS_OFF, 0, 0}};
 static ISwitchVectorProperty autoFocusSP = {mydev, "AUTOFOC", "", MAIN_GROUP, IP_RW, ISR_NOFMANY, 0, IPS_IDLE, autoFocusS, NARRAY(autoFocusS), "", 0};
 
 //Filter wheel buttons
@@ -363,7 +388,7 @@ char rawCmdString[50];
 		rawCmdT[0].text = rawCmdString;
 		head_nodeT[0].text = head_nodeString;
 		strcpy(ttyPortTP.tp[0].text, "/dev/ttyUSB0");
-		strcpy(networkTP.tp[0].text, "10.0.3.86:10001");
+		strcpy(networkTP.tp[0].text, "10.0.3.15:4900");
 		fillFWheels();		
 		fillMotors();
 		firstGetProperties=0;
@@ -384,7 +409,7 @@ char rawCmdString[50];
 	IDDefText(&rawCmdTP, NULL);
 	
 	IDDefSwitch(&lfSP, NULL);
-	IDDefSwitch(&ufSP, NULL);
+IDDefSwitch(&ufSP, NULL);
 	IDDefSwitch(&gfSP, NULL);
 
 	IDDefSwitch(&serialfixSP, NULL);
@@ -406,6 +431,7 @@ char rawCmdString[50];
 	IDDefNumber  (&offxNPR, NULL);
 	IDDefNumber  (&offyNPR, NULL);
 	IDDefNumber  (&offFocNPR, NULL);
+	IDDefNumber  (&offFocInputNPR, NULL);
 	IDDefNumber  (&offMirrNPR, NULL);
 	IDDefNumber  (&ofwNPR, NULL);
 	
@@ -532,29 +558,51 @@ char rawCmdString[50];
  void ISNewNumber (const char *dev, const char *name, double values[], char *names[], int n)
  { 
 	int err; char ret[100];
-	double xmm, ymm, focusmm, delta_focusmm;
+	double zmm, zprimemm, xmm, ymm, focusmm, delta_focusmm, focus_curve_subtraction;
          /* ignore if not ours */
 	if (strcmp (dev, mydev))
 		return;
  
 
 
-	if (!strcmp (name, offFocNPR.name)) {
+	if (!strcmp (name, offFocInputNPR.name)) {
              /* new Focus Position */
              /* Check connectSP, if it is idle, then return */
              if (connectSP.s == IPS_IDLE)
              {
 				 
-                 offFocNPR.s = IPS_IDLE;
+                 offFocInputNPR.s = IPS_IDLE;
                  IDSetNumber(&offFocNPR, "Guider is offline.");
                  return;
              }
-             stageGoTo(RS485_FD, offFocNPR.name, (int)(values[0]/ENCODER2MM));
+	     zmm=0;
+	     zprimemm=0;
+	     for(int ii=0; ii<n; ii++ )
+	     {
+	     	 if( !strcmp(names[ii], "USER_POS") )
+		 	zmm=values[ii];
+		 else if( !strcmp(names[ii], "USER_OFFSET")  )
+			 zprimemm = values[ii];
+	     }
+             xmm = offxNPR.np[0].value;
+             ymm = offyNPR.np[0].value;
+	     offFocInputNPR.np[0].value=zmm;
+	     offFocInputNPR.np[1].value=zprimemm;
+	     focus_curve_subtraction = focus_trans(xmm, ymm);
+
+	     if(autoFocusS[0].s == ISS_ON)
+	     {
+             	stageGoTo(RS485_FD, offFocNPR.name, (int)((zmm + zprimemm + focus_curve_subtraction)/ENCODER2MM));
+	     }
+	     else
+	     {
+	     	stageGoTo(RS485_FD, offFocNPR.name, (int)((zmm + zprimemm)/ENCODER2MM));
+	     }
 	
-	     offFocNPR.s = IPS_IDLE;
 	     IDSetNumber(&offFocNPR, NULL);
              return;
-	    }
+	}
+
 	else if (!strcmp (name, offxNPR.name)) {
              /* new X Position */
              /* Check connectSP, if it is idle, then return */
@@ -567,20 +615,21 @@ char rawCmdString[50];
 
              xmm = offxNPR.np[0].value;
              ymm = offyNPR.np[0].value;
-	     delta_focusmm = focus_trans(values[0], ymm) - focus_trans(xmm, ymm);
-	     focusmm = offFocNPR.np[0].value;
-	     IDMessage(mydev, "New focus position %f %f %f %f %f %f", values[0], xmm, ymm, focusmm, delta_focusmm, (focusmm+delta_focusmm));
+	     zmm = offFocInputNPR.np[0].value;
+	     zprimemm = offFocInputNPR.np[1].value;
+	     delta_focusmm = focus_trans(values[0], ymm);
+	     focus_curve_subtraction = focus_trans(values[0], ymm);
 
 	     if(autoFocusS[0].s == ISS_ON)
 	     {
-             	stageGoTo(RS485_FD, offFocNPR.name, (int)((focusmm+delta_focusmm)/ENCODER2MM));
+             	stageGoTo(RS485_FD, offFocNPR.name, (int)((zmm + zprimemm + focus_curve_subtraction)/ENCODER2MM));
 	     }
              stageGoTo(RS485_FD, offxNPR.name, (int)((values[0]+XOFFSET)/ENCODER2MM));
 	
 	     offxNPR.s = IPS_IDLE;
 	     IDSetNumber(&offxNPR, NULL);
              return;
-	    }
+	}
 	else if (!strcmp (name, offyNPR.name)) {
              /* new Y Position */
              /* Check connectSP, if it is idle, then return */
@@ -593,12 +642,12 @@ char rawCmdString[50];
  
 	     xmm = offxNPR.np[0].value;
              ymm = offyNPR.np[0].value;
-	     delta_focusmm = focus_trans(xmm, values[0]) - focus_trans(xmm, ymm);
-	     IDMessage(mydev, "New focus position %f", (focusmm+delta_focusmm));
-	     focusmm = offFocNPR.np[0].value;
+	     zmm = offFocInputNPR.np[0].value;
+	     zprimemm = offFocInputNPR.np[1].value;
+	     focus_curve_subtraction = focus_trans(xmm, values[0]);
 	     if(autoFocusS[0].s == ISS_ON)
 	     {
-             	stageGoTo(RS485_FD, offFocNPR.name, (int)((focusmm+delta_focusmm)/ENCODER2MM));
+             	stageGoTo(RS485_FD, offFocNPR.name, (int)((zmm + zprimemm + focus_curve_subtraction)/ENCODER2MM));
 	     }
 
              //TODO check which mirros is in.
@@ -700,7 +749,7 @@ int isDifferent;
 char respbuffer[50];
 char L, F, S;
 int fnum, init_struct=1;
-
+double focus_curve_subtraction, xmm, ymm, zmm, zprimemm;
 
 	/* ignore if not ours */
 	if (strcmp (dev, mydev))
@@ -1092,24 +1141,33 @@ int fnum, init_struct=1;
 		IUResetSwitch(&serialfixSP);
 		IDSetSwitch(&serialfixSP, "Sent Serial Fix");
 	}
+
 	else if( !strcmp(name, autoFocusSP.name))
-	{
+	{//Auto focus routine.
 		if(connectS[0].s == ISS_OFF)
 		{//we aren't connected.
 			autoFocusS[0].s = ISS_OFF;
 			IDSetSwitch(&autoFocusSP, NULL);
 			return;
 		}
-
+		
+             	xmm = offxNPR.np[0].value;
+		ymm = offyNPR.np[0].value;
+		zmm = offFocInputNPR.np[0].value;
+		zprimemm = offFocInputNPR.np[1].value;
+		focus_curve_subtraction = focus_trans(xmm, ymm);
+             	stageGoTo(RS485_FD, offFocNPR.name, (zmm+zprimemm+focus_curve_subtraction)/ENCODER2MM );
 		if(states[0] == ISS_ON)
 		{
 			autoFocusSP.s=IPS_OK;
 			autoFocusS[0].s = ISS_ON;
+             		stageGoTo(RS485_FD, offFocNPR.name, (zmm+zprimemm+focus_curve_subtraction)/ENCODER2MM );
 		}
 		else
 		{
 			autoFocusSP.s=IPS_IDLE;
 			autoFocusS[0].s = ISS_OFF;
+             		stageGoTo(RS485_FD, offFocNPR.name, (zmm+zprimemm)/(ENCODER2MM) );
 		}
 		IDSetSwitch(&autoFocusSP, NULL);
 
@@ -1487,7 +1545,13 @@ static int guiderTelem(int init_struct)
 			{
 				IUResetSwitch(&gfSP);
 				gfSP.s = IPS_OK;	
-				gfS[motor->fnum].s = ISS_ON;
+				gfS[motor->fnum].s = ISS_ON;	
+
+				if( !motor->isHomed)
+				{
+					gfSP.s = IPS_BUSY;
+				}
+
 			}
 			IDSetSwitch(&gfSP, NULL);
 		}
@@ -1503,6 +1567,15 @@ static int guiderTelem(int init_struct)
 		else if( !strcmp( motor->name, "OFFSET_FOCUS" ) )
 		{
 			 pNVP->np[0].value = (motor->pos*ENCODER2MM);
+			 if(motor->isHomed)
+			 {
+				 offFocInputNPR.s = IPS_OK;
+			 }
+			 else
+			 {
+				 offFocInputNPR.s = IPS_BUSY;
+			 }
+			 IDSetNumber(&offFocInputNPR, NULL);
 		}
 		else if( !strcmp( motor->name, "OFFSET_MIRRORS" ) )
 		{

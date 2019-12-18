@@ -39,7 +39,7 @@ sudo service webclient-compose restart
 The systemd service uses docker-compose to run three different docker contianers:
 1. The nginx webserver
 2. The webclient
-2. The indiserver and drivers
+3. The indiserver and drivers
 
 The docker-compose yml file is [here](https://github.com/srswinde/indi_webclient/blob/master/docker-compose-vatt-guidebox.yml). One could of course run all these items outside of docker but docker simplifies the implementation. Docker can however make development a little more complicated as you have to put the new indi-vatt-guidebox binary inside the [indihex](https://hub.docker.com/r/srswinde/indihex) docker contianer. If you wish to run the indidriver natively you can kill the indihex container and run the driver on port 7623 and all should work. 
 
