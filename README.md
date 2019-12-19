@@ -67,6 +67,16 @@ indiserver -p <port> ./indi-vatt-guidebox
 
 The <port> number is the port that the INDI client will use to access the indiserver. Currently for the secondary hexapod and guidebox control we use port 7623. This is ofcourse subject to change without notice here. 
 
+## Auto Focus Routine
+
+The optical field projected onto the guider camera is very curved, especially in the regions covered by the U-Mirror. This causes focus to be a function of the X and Y stages of the offset guide camera. This function can be modeled as the following polynomial:
+
+```33.325*r^2+0.0063*r+0.0012```
+
+```r``` in this case is the radial distance of the guider determined by ```sqrt(x^2+y^2)``` and x an y are the X and Y positions of the guide camera. 
+
+When the user puts the INDI driver in the auto focus routine state, every X an Y move will result in a change in focus based on the above equation. 
+
 ## User Bits
 User Bits are user defined bits on word 12 of the SmartMotor set of information bits. The allmotors.sms defines them thusly:
 
