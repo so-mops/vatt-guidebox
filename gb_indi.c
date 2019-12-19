@@ -234,7 +234,7 @@ static char head_nodeString[20];
 static ITextVectorProperty head_nodeTP = { mydev, "HEAD", "Head Motor Node", ENG_GROUP , IP_RO, 0, IPS_IDLE,  head_nodeT, NARRAY(head_nodeT), "", 0};
 
 //Auto Focus Button
-static ISwitch autoFocusS[1] = {{"AUTOFOC", "Foc Field Curve", ISS_OFF, 0, 0}};
+static ISwitch autoFocusS[1] = {{"AUTOFOC", "Auto Focus", ISS_OFF, 0, 0}};
 static ISwitchVectorProperty autoFocusSP = {mydev, "AUTOFOC", "", MAIN_GROUP, IP_RW, ISR_NOFMANY, 0, IPS_IDLE, autoFocusS, NARRAY(autoFocusS), "", 0};
 
 //Filter wheel buttons
