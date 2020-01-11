@@ -1327,7 +1327,7 @@ static int guiderTelem(int init_struct)
 	ILight *userbitsLights;
 	ILightVectorProperty *userBitsVP;
 	//end not implemented 
-	
+	int faulted=0;
 
 	int iter=1;
 
@@ -1360,6 +1360,7 @@ static int guiderTelem(int init_struct)
 	//indi fields.
 	for(MSTATUS *motor=allmotors; motor!=allmotors+NMOTORS; motor++)
 	{
+		
 		if(init_struct)
 		{
 			//apply names to indi_motors from allmotors array.
@@ -1401,14 +1402,15 @@ static int guiderTelem(int init_struct)
 		if ( motor->isActive )
 		{/*motor->isActive tells us weather the head node was able to communicate with 
 		 motor over the can bus.*/
+
 			if ( motor->inNegLimit )
 			{
-				pNVP->s = IPS_ALERT; //Motor is homed and ready to go
+				pNVP->s = IPS_ALERT; 
 				IDMessage(mydev, "%s in negative limit!", motor->name);
 			}
 			else if(motor->inPosLimit)
 			{
-				pNVP->s = IPS_ALERT; //Motor is homed and ready to go
+				pNVP->s = IPS_ALERT; 
 				IDMessage(mydev, "%s in positive limit!", motor->name);
 			}
 
@@ -1424,7 +1426,14 @@ static int guiderTelem(int init_struct)
 			{
 				pNVP->s = IPS_BUSY;
 			}
-				
+
+			faulted=0;
+			if( motor->iobits & (1<<11) )
+			{//Check for a motor fault
+				pNVP->s = IPS_ALERT; 
+				faulted=1;
+				IDMessage(mydev, "%s Faulted!", motor->name);
+			}
 
 			//pNVP->np[0].value = motor->pos*ENCODER2MM;
 			w0_statusLight = indi_motors[motor->motor_num-1].word0L;
@@ -1488,6 +1497,10 @@ static int guiderTelem(int init_struct)
 			{
 				lfSP.s = IPS_BUSY;	
 			}
+			else if(faulted)
+			{
+				lfSP.s = IPS_ALERT;
+			}
 			else
 			{
 				IUResetSwitch(&lfSP);
@@ -1513,6 +1526,10 @@ static int guiderTelem(int init_struct)
 			if( motor->isMoving )
 			{
 				ufSP.s = IPS_BUSY;	
+			}
+			else if(faulted)
+			{
+				ufSP.s = IPS_ALERT;
 			}
 			else
 			{
@@ -1540,6 +1557,10 @@ static int guiderTelem(int init_struct)
 			if( motor->isMoving )
 			{
 				gfSP.s = IPS_BUSY;	
+			}
+			else if( faulted )
+			{
+				gfSP.s = IPS_ALERT;
 			}
 			else
 			{
@@ -1609,6 +1630,11 @@ static int guiderTelem(int init_struct)
 			else
 			{
 				mirr_posSP.s = IPS_OK;
+			}
+
+			if(faulted)
+			{
+				mirr_posSP.s = IPS_ALERT;
 			}
 			
 			IDSetSwitch(&mirr_posSP, NULL);
