@@ -66,6 +66,18 @@ indiserver -p <port> ./indi-vatt-guidebox
 ```
 
 The <port> number is the port that the INDI client will use to access the indiserver. Currently for the secondary hexapod and guidebox control we use port 7623. This is ofcourse subject to change without notice here. 
+  
+## Deploy at VATT
+Because the developemnt to deployment is a little complicate, I will walk the reader through it. Let's say we want to change something in the INDI driver (gb_indi.c), build it and set this new build as the default build on VATT. To do this you would follow these steps:
+
+1. Make the changes in gb_indi.c
+2. Build the indi-vatt-guidebox binary with ```make```
+3. Copy the indi-vatt-guidebox binary to the vatthex-indi source directory
+4. build the srswinde/indihex:guidebox_indi docker container with the [build.sh](https://github.com/so-mops/vatthex-indi/blob/master/build.sh) script
+5. Restart the webclient-compose service with:
+```bash
+service webclient-compose restart
+```
 
 ## Auto Focus Routine
 
