@@ -1428,11 +1428,13 @@ static int guiderTelem(int init_struct)
 			}
 
 			faulted=0;
-			if( motor->iobits & (1<<11) )
+			if( (motor->iobits & (1<<11)  == 0) )
 			{//Check for a motor fault
+			//IO bit 11 (word 16) is the "not faulted" bit.
+			
 				pNVP->s = IPS_ALERT; 
 				faulted=1;
-				IDMessage(mydev, "%s Faulted!", motor->name);
+				IDMessage(mydev, "%s Faulted! bits=%i", motor->name, motor->iobits);
 			}
 
 			//pNVP->np[0].value = motor->pos*ENCODER2MM;
@@ -1660,7 +1662,7 @@ static int guiderTelem(int init_struct)
 	{
 		if( solenoid_status == ON )
 		{
-			IDMessage(mydev, "FHWEELS On and should be off");
+			//IDMessage(mydev, "FWHEELS On and should be off");
 			moog_write(RS485_FD, "OR(7):7");
 			moog_write(RS485_FD, "OR(8):7");
 		}
