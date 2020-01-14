@@ -35,7 +35,9 @@ class gbtalk():
                 print(resp)
 
 
-
+def highbits(val):
+    for a in range(16):
+        print(a, (val & (1<<a)))
 
 
 def read(conn=None):

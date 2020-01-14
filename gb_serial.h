@@ -21,6 +21,7 @@
 typedef struct 
 {
 	int words[4]; //status words
+	
 	int userbits;
 	int iobits;
 	int motor_num;//CAN bus address
@@ -37,6 +38,17 @@ typedef struct
 	int fdist; // distance in counts b/w filters
 	int neg_slimit;// negative software limits
 	int pos_slimit;//positive software limit
+
+	//NOTE: The first 4 status words are contained in 
+	//the words member they are sequential word 6
+	//gets its own member because we skip word 5
+	int word6; //status word 6
+
+	//NOTE: Current here is not necessarily related
+	//to the torque. See UIA command in the MOOG
+	//Smart Motor Developers guide. 
+	int current; //Current on the windings
+	int temp; //temp in degrees C
 
 
 } MSTATUS;

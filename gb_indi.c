@@ -337,6 +337,17 @@ typedef struct _INDIMOTOR
 	INumberVectorProperty fdistNP;
 	INumber fdsitN[1];
 
+	
+	INumberVectorProperty word6NP;
+	INumber word6N[1];
+
+	INumberVectorProperty currentNP;
+	INumber currentN[1];
+
+	INumberVectorProperty tempNP;
+	INumber tempN[1];
+
+
 	int motor_num; //CAN address
 
 } INDIMOTOR;
@@ -1383,7 +1394,6 @@ static int guiderTelem(int init_struct)
 		//filternumber of each axis. 	
 		
 		pNVP = motor2nvp(motor);
-		//IDMessage(mydev, "%s %i %i %i", motor->name, motor->words[0], motor->words[1], motor->userbits);
 		if(pNVP == NULL)
 		{//stuct did not init properly.
 			IDMessage(mydev, "%i Motor %s (Num %i) was not intialized correctly in the allmotors array. This indicates a communication failure.", iter, motor->name, motor->motor_num);
@@ -1402,6 +1412,8 @@ static int guiderTelem(int init_struct)
 		if ( motor->isActive )
 		{/*motor->isActive tells us weather the head node was able to communicate with 
 		 motor over the can bus.*/
+
+			
 
 			if ( motor->inNegLimit )
 			{
@@ -1436,6 +1448,15 @@ static int guiderTelem(int init_struct)
 				faulted=1;
 				IDMessage(mydev, "%s Faulted! bits=%i", motor->name, motor->iobits);
 			}
+			
+			indi_motors[motor->motor_num-1].tempN[0].value = (double)motor->temp;
+			IDSetNumber(&indi_motors[motor->motor_num-1].tempNP, NULL);
+
+			indi_motors[motor->motor_num-1].currentN[0].value = (double)motor->current;
+			IDSetNumber(&indi_motors[motor->motor_num-1].currentNP, NULL);
+		
+			indi_motors[motor->motor_num-1].word6N[0].value = (double)motor->word6;
+			IDSetNumber(&indi_motors[motor->motor_num-1].word6NP, NULL);
 
 			//pNVP->np[0].value = motor->pos*ENCODER2MM;
 			w0_statusLight = indi_motors[motor->motor_num-1].word0L;
@@ -1444,6 +1465,8 @@ static int guiderTelem(int init_struct)
 			w1_statusLightVP = &indi_motors[motor->motor_num-1].word1LP;
 			ioBitSwitch = indi_motors[motor->motor_num-1].iowordS;
 			ioBitSwitchVector = &indi_motors[motor->motor_num-1].iowordSP;
+
+			
 
 			if(w0_statusLight != NULL)
 			{
@@ -1670,7 +1693,6 @@ static int guiderTelem(int init_struct)
 	}
 	else
 	{
-		IDMessage(mydev, "FHWEELS ON");
 		solenoid_status = ON;
 	}
 
@@ -1769,7 +1791,7 @@ static void fillMotors()
 	int motor_num = 1;
 	fprintf(stderr, "FILLING THE MOTORS\n");
 	int lenlimit = 30;
-	const char * STATUS_CODES[2][16] = {
+const char * STATUS_CODES[2][16] = {
 		{
 			"Drive Ready",
 			"Bo: Motor is off (indicator)",
@@ -1826,11 +1848,22 @@ static void fillMotors()
 
 		snprintf( name, 20, "M%iName", motor_num );
 		IUFillTextVector(&imotor->nameTP, imotor->nameT, NARRAY(imotor->nameT), mydev, name, "Motor Name", group, IP_RO, 0, IPS_IDLE);
-
 		IUFillText(imotor->nameT, "MNAME", "Motor Name", "NULL");
-
 		imotor->nameT[0].text = imotor->nameString;
-		IDDefText(&imotor->nameTP, NULL);
+		IDDefText(&imotor->nameTP, NULL);	
+
+		snprintf(name, 20, "M%iTEMP", motor_num);
+		IUFillNumberVector(&imotor->tempNP, imotor->tempN, NARRAY(imotor->tempN), mydev, name, "Motor Temp", group, IP_RO, 0, IPS_IDLE);
+		IUFillNumber(imotor->tempN, "TEMP", "Motor Temp [C]", "%f", -30.0, 100.0, 1, 0);
+
+		snprintf(name, 20, "M%iCURRENT", motor_num);
+		IUFillNumberVector(&imotor->currentNP, imotor->currentN, NARRAY(imotor->currentN), mydev, name, "Motor Current", group, IP_RO, 0, IPS_IDLE);
+		IUFillNumber(imotor->currentN, "CURRENT", "milli Amps", "%f", -8000.0, 8000.0, 1, 0);
+
+		snprintf(name, 20, "M%iWORD6", motor_num);
+		IUFillNumberVector(&imotor->word6NP, imotor->word6N, NARRAY(imotor->word6N), mydev, name, "Motor Status Word 6", group, IP_RO, 0, IPS_IDLE);
+		IUFillNumber(imotor->word6N, "WORD6", "Motor Word 6", "%f", 0.0, 65536.0, 1, 0);
+
 
 		snprintf( label, 20, "Motor %i Word 0", motor_num );
 		snprintf( name, 20, "M%iW0", motor_num );
@@ -1854,7 +1887,7 @@ static void fillMotors()
 			}
 			else if(code_num == 11)
 			{//... and a line for Not Faulted...
-				IUFillSwitch(imotor->iowordS+code_num, "NOFAULT", "Not Fauted", ISS_OFF);
+				IUFillSwitch(imotor->iowordS+code_num, "NOFAULT", "Not Faulted", ISS_OFF);
 			}
 			else if(code_num == 12)
 			{//... and a line for Drive enable output which should always be high.
@@ -1908,6 +1941,9 @@ static void defMotors()
 		IDDefLight(&imotor->word0LP, NULL);
 		IDDefSwitch(&imotor->iowordSP, NULL);
 		IDDefLight(&imotor->word1LP, NULL);
+		IDDefNumber(&imotor->tempNP, NULL);
+		IDDefNumber(&imotor->currentNP, NULL);
+		IDDefNumber(&imotor->word6NP, NULL);
 	}
 }
 

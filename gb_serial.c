@@ -736,7 +736,7 @@ int moog_getallstatus_quick(int rs485_fd, MSTATUS motors[])
 {
 	char resp[5000];
 	int read_status=0;
-	int motor_num=0, pos, f, w0, w1, w2, w3, userbits, iobits;
+	int motor_num=0, pos, f, w0, w1, w2, w3, userbits, iobits, word6, temp, current;
 	int wc, active;
 	static int foo = 0;
 	int motor_count=0;
@@ -766,8 +766,8 @@ int moog_getallstatus_quick(int rs485_fd, MSTATUS motors[])
 	{
 		
 		moog_read(rs485_fd, resp);
-		wc = sscanf(resp, "%i %i %i %i %i %i %i %i %i", &motor_num, &pos, &f, &w0, &w1, &w2, &w3, &userbits, &iobits );
-		if (wc != 9)
+		wc = sscanf(resp, "%i %i %i %i %i %i %i %i %i %i %i %i", &motor_num, &pos, &f, &w0, &w1, &w2, &w3, &userbits, &iobits, &word6, &temp, &current  );
+		if (wc != 12)
 		{
 			fprintf(stderr, "bad\n" );
 			//fprintf(stderr, "[%s]\n", resp );
@@ -796,11 +796,13 @@ int moog_getallstatus_quick(int rs485_fd, MSTATUS motors[])
 				motor->inNegLimit = w0 & (1<<15);
 				motor->isMoving = w0 & (1<<2);
 				motor->isHomed = userbits & 1;
+				motor->word6 = word6;
+				motor->current = current;
+				motor->temp = temp;
 				motor_count++;
 			}
 		}
 	}
-
 	if(motor_count != 7)
 	{
 		
