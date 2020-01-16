@@ -1045,7 +1045,7 @@ double focus_curve_subtraction, xmm, ymm, zmm, zprimemm;
 				else
 				{
 
-					IDMessage( mydev, "Match for %i", fnum );
+					//IDMessage( mydev, "Match for %i", fnum );
 					stageGoTo( RS485_FD, lfwNPR.name, fnum );
 				}
 
@@ -1076,7 +1076,7 @@ double focus_curve_subtraction, xmm, ymm, zmm, zprimemm;
 				else
 				{
 
-					IDMessage(mydev, "Match for %i", fnum );
+					//IDMessage(mydev, "Match for %i", fnum );
 					stageGoTo( RS485_FD, ufwNPR.name, fnum );
 				}
 
@@ -1449,13 +1449,13 @@ static int guiderTelem(int init_struct)
 				IDMessage(mydev, "%s Faulted! bits=%i", motor->name, motor->iobits);
 			}
 			
-			indi_motors[motor->motor_num-1].tempN[0].value = (double)motor->temp;
+			indi_motors[motor->motor_num-1].tempN[0].value = (double) motor->temp;
 			IDSetNumber(&indi_motors[motor->motor_num-1].tempNP, NULL);
 
-			indi_motors[motor->motor_num-1].currentN[0].value = (double)motor->current;
+			indi_motors[motor->motor_num-1].currentN[0].value = (double) motor->current;
 			IDSetNumber(&indi_motors[motor->motor_num-1].currentNP, NULL);
 		
-			indi_motors[motor->motor_num-1].word6N[0].value = (double)motor->word6;
+			indi_motors[motor->motor_num-1].word6N[0].value = (double) motor->word6;
 			IDSetNumber(&indi_motors[motor->motor_num-1].word6NP, NULL);
 
 			//pNVP->np[0].value = motor->pos*ENCODER2MM;
