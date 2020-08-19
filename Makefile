@@ -4,6 +4,7 @@
 
 GB_INDI_OBJS = gb_serial.o gb_indi.o gb_commands.o
 GB_STANDALONE_OBJS = gb_serial.o gb_standalone.o gb_commands.o
+GB_NG_OBJS =  ng_server.o gb_serial.o gb_commands.o
 GB_NG_OBJS = test.o ng_server.o gb_serial.o gb_commands.o
 GCCFLAGS=-std=gnu99
 

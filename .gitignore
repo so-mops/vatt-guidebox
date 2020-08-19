@@ -1,0 +1,8 @@
+**/*.o
+.ropeproject/*
+LOWER_FNAMES
+a.out
+gb_ng
+indi-vatt-guidebox
+vatt-guidebox
+**/*.swp
