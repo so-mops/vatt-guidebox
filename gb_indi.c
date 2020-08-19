@@ -114,8 +114,8 @@ static ISwitchVectorProperty getdataSP = { qrydev, "GETDATA", "Get Data",  MAIN_
 
 // connection type switch
 static ISwitch comTypeS[] = {
-	 {"NETWORK",  "Network",  ISS_OFF, 0, 0},
-         {"SERIAL",  "Serial",  ISS_ON, 0, 0}
+	 {"NETWORK",  "Network",  ISS_ON, 0, 0},
+         {"SERIAL",  "Serial",  ISS_OFF, 0, 0}
 	 };
 static ISwitchVectorProperty comTypeSP = { mydev, "COMTYPE", "Connection Type",  ENG_GROUP, IP_RW, ISR_1OFMANY, 0, IPS_IDLE,  comTypeS, NARRAY(comTypeS), "", 0 };
 
@@ -434,7 +434,7 @@ IDDefSwitch(&ufSP, NULL);
 	defWheels();
 
 
-	gcomtype = SER;
+	gcomtype = NET;
         
 	/***********GOTO*************/
 	IDDefNumber  (&ufwNPR, NULL);
@@ -1346,6 +1346,7 @@ static int guiderTelem(int init_struct)
 	ISwitchVectorProperty *ioBitSwitchVector;
 
 	char readBuffer[40];
+	moog_serialfix( RS485_FD );
 	moog_write( RS485_FD, "RW(13)" );
 	moog_read(RS485_FD, readBuffer );
 	int head_node;
