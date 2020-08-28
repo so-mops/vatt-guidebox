@@ -39,7 +39,7 @@ ng_server.o: ng_server.c
 test.o:	test.c
 	gcc $(GCCFLAGS) -c test.c
 
-
+# Not using make install, moving away from /usr/local/bin
 install:
 	cp ./indi-vatt-guidebox /usr/local/bin/
 
