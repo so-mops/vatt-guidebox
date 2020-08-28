@@ -1,5 +1,11 @@
 # VATT guide box software
 
+## Undockerized
+This is now not using docker. Make the file as normal and the indiserver launcher on the desktop runs it on port 7600.
+
+*Now back to the README.*
+_____
+
 This is the new VATT guidebox software repository. This software comes in three pieces:
 1. Control software flashed onto the guide box motors. It is called [allmotors.sms](https://github.com/so-mops/vatt-guidebox/blob/master/allmotors.sms).
 2. The [set of functons](https://github.com/so-mops/vatt-guidebox/blob/master/gb_serial.c) used to communicate with the motors
