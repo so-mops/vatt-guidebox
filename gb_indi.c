@@ -518,11 +518,13 @@ IDDefSwitch(&ufSP, NULL);
 		for(int jj=0; jj<n; jj++)
 		{
 			if( strcmp(texts[jj],  lfnT[jj].text) )
-			{
+			{	
 				strcpy( lfnT[jj].text, texts[jj] );
+                                strcpy( lfS[jj].label, texts[jj] );
 				saveFNames(lfnTP.name, texts[jj], lfnT[jj].name );
 			}
 		}
+                IDSetSwitch(&lfSP, "changed the switch");
 		IDSetText(&lfnTP, NULL );
 		
 	}	
@@ -536,10 +538,12 @@ IDDefSwitch(&ufSP, NULL);
 			if( strcmp(texts[jj], ufnT[jj].text) != 0 )
 			{
 				strcpy( ufnT[jj].text, texts[jj] );
+				strcpy( ufS[jj].label, texts[jj] );
 				saveFNames(ufnTP.name, texts[jj], ufnT[jj].name );
 			}
 		}
-		IDSetText(&ufnTP, NULL );
+		IDSetSwitch(&ufSP, "changed the switch");
+                IDSetText(&ufnTP, NULL );
 	}
 
 	if( !strcmp(name, "GUIDER_FNAMES") )
