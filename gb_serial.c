@@ -760,7 +760,7 @@ int moog_getallstatus_quick(int rs485_fd, MSTATUS motors[])
 
 	moog_callsub( rs485_fd, 998, -1);
 
-
+	int retries = 0;
 	usleep(500000);
 	while(motor_num <7 )
 	{
@@ -769,7 +769,10 @@ int moog_getallstatus_quick(int rs485_fd, MSTATUS motors[])
 		wc = sscanf(resp, "%i %i %i %i %i %i %i %i %i %i %i %i", &motor_num, &pos, &f, &w0, &w1, &w2, &w3, &userbits, &iobits, &word6, &temp, &current  );
 		if (wc != 12)
 		{
-			fprintf(stderr, "bad\n" );
+			retries++;
+			if (retries >= 5)
+				return -1;
+			fprintf(stderr, "bad, %i\n", retries );
 			//fprintf(stderr, "[%s]\n", resp );
 			//moog_serialfix(rs485_fd);
 			continue;
@@ -777,6 +780,7 @@ int moog_getallstatus_quick(int rs485_fd, MSTATUS motors[])
 		else
 		{
 			//fprintf(stderr, "{%s}\n", resp );
+			retries = 0;
 		}
 		//fprintf(stderr, " %i %i %i %i %i %i %i %i %i\n", motor_num, pos, f, w0, w1, w2, w3, userbits, iobits );
 		for(MSTATUS *motor=motors; motor!=motors+NMOTORS; motor++)
