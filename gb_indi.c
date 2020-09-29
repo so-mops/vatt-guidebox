@@ -1371,7 +1371,6 @@ static int guiderTelem(int init_struct)
 	{
 		head_node = allmotors[0].head_node;
 	}
-
 	//Iterate through the allmotors array so we can populate 
 	//indi fields.
 	for(MSTATUS *motor=allmotors; motor!=allmotors+NMOTORS; motor++)
@@ -1523,6 +1522,7 @@ static int guiderTelem(int init_struct)
 		//motor specific things
 		if( !strcmp( motor->name, "FWHEEL_LOWER" ) )
 		{
+		
 			if( motor->isMoving )
 			{
 				lfSP.s = IPS_BUSY;	
@@ -1595,7 +1595,11 @@ static int guiderTelem(int init_struct)
 			else
 			{
 				IUResetSwitch(&gfSP);
-				gfSP.s = IPS_OK;	
+				gfSP.s = IPS_OK;
+				/*if(motor->fnum > 4){
+					motor->fnum=0;
+					fprintf(stderr, "heres the bug\n");}
+				fprintf(stderr, "fnum=%i  ishomed=%i\n", motor->fnum, motor->isHomed);*/	
 				gfS[motor->fnum].s = ISS_ON;	
 
 				if( !motor->isHomed)
@@ -1630,6 +1634,7 @@ static int guiderTelem(int init_struct)
 		}
 		else if( !strcmp( motor->name, "OFFSET_MIRRORS" ) )
 		{
+
 			pNVP->np[0].value = (motor->pos*ENCODER2MM);
 
 			mirr_posS[0].s = ISS_OFF;
@@ -1646,7 +1651,7 @@ static int guiderTelem(int init_struct)
 			}
 			else if(( -1.0 < motor->pos*ENCODER2MM ) && ( motor->pos*ENCODER2MM < 1.0 ) )
 			{
-				mirr_posS[1].s = ISS_ON;
+				mirr_posS[2].s = ISS_ON;
 			}
 
 			if(motor->isMoving)
@@ -1673,6 +1678,7 @@ static int guiderTelem(int init_struct)
 		iter++;
 		IDSetNumber(pNVP, NULL);
 	}
+
 	if(allHomed)
 	{
 		actionSP.s = IPS_OK;

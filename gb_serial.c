@@ -24,6 +24,9 @@
 
 #define error_message printf
 #define NMOTORS 7
+
+int moog_lock=0;
+
 const char * STATUS_CODES[4][16] = {
 	{
 		"Drive Ready",
@@ -360,9 +363,12 @@ int moog_write( int rs485_fd, const char *msg )
 	if( strlen(msg) > SENDSIZE-1 ) 
 		return -1; //Buffer oversize.
 
-	
+	while(moog_lock){
+		fprintf(stderr, "damn mutex!\n");
+		usleep(100000);
+		}
 	snprintf(send_buffer, strlen(msg)+2, "%s ", msg );
-	//fprintf(stderr, "sending <%s>\n", send_buffer);
+	fprintf(stderr, "sending <%s>\n", send_buffer);
 	write( rs485_fd, send_buffer, strlen(send_buffer) );
 }
 
@@ -394,7 +400,7 @@ int moog_read( int rs485_fd, char resp[] )
 	FD_ZERO(&set);
 	FD_SET(rs485_fd, &set);
 	
-
+	moog_lock=1;
 	while(rn > 0)
 	{
 		if(select( rs485_fd+1, &set, NULL, NULL, &timeout ) == 1)
@@ -404,6 +410,7 @@ int moog_read( int rs485_fd, char resp[] )
 			if(resp[ii] == '\r' || resp[ii] == '\n')
 			{
 				resp[ii+1] = '\0';
+				moog_lock = 0;
 				return 0;// finished line
 			}
 			ii++;
@@ -413,6 +420,7 @@ int moog_read( int rs485_fd, char resp[] )
 			break;
 		}
 	}
+	moog_lock=0;
 	return -1;// there is no data on the line
 }
 
@@ -782,6 +790,11 @@ int moog_getallstatus_quick(int rs485_fd, MSTATUS motors[])
 			//fprintf(stderr, "{%s}\n", resp );
 			retries = 0;
 		}
+		//f seems to come back as ridiculous numbers sometimes...  lets fix it
+		if(f>4){
+			fprintf(stderr, "found the bug\n");
+			f=0;
+			}
 		//fprintf(stderr, " %i %i %i %i %i %i %i %i %i\n", motor_num, pos, f, w0, w1, w2, w3, userbits, iobits );
 		for(MSTATUS *motor=motors; motor!=motors+NMOTORS; motor++)
 		{
