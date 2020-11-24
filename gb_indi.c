@@ -1291,6 +1291,7 @@ static INumberVectorProperty *motor2nvp(MSTATUS *motor)
 	}
 	else if(strcmp( motor->name,  "FWHEEL_LOWER") == 0)
 	{
+        // TODO here are motor names to use to not display limit
 		NVP = &lfwNPR;
 	}
 	else
