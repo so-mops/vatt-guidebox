@@ -636,7 +636,7 @@ IDDefSwitch(&ufSP, NULL);
 	     zprimemm = offFocInputNPR.np[1].value;
 	     //delta_focusmm = focus_trans(values[0], ymm);
 	     focus_curve_subtraction = focus_trans(values[0], ymm);
-
+        IDMessage(mydev, "X Offset: %f,%f,%f,%f,%f", xmm, ymm, zmm, zprimemm, focus_curve_subtraction);
 	     if(autoFocusS[0].s == ISS_ON)
 	     {
               IDMessage(mydev, "Autofoc on, moving stage before Off X move");
@@ -667,6 +667,7 @@ IDDefSwitch(&ufSP, NULL);
 	     zmm = offFocInputNPR.np[0].value;
 	     zprimemm = offFocInputNPR.np[1].value;
 	     focus_curve_subtraction = focus_trans(xmm, values[0]);
+       IDMessage(mydev, "y Offset: %f,%f,%f,%f,%f", xmm, ymm, zmm, zprimemm, focus_curve_subtraction);
 	     if(autoFocusS[0].s == ISS_ON)
 	     {
               IDMessage(mydev, "Autofoc on, moving stage before Off Y move");
