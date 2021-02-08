@@ -621,10 +621,12 @@ IDDefSwitch(&ufSP, NULL);
 	else if (!strcmp (name, offxNPR.name)) {
              /* new X Position */
              /* Check connectSP, if it is idle, then return */
+             IDMessage(mydev, "Starting Off X move...");
              if (connectSP.s == IPS_IDLE)
              {
                  offxNPR.s = IPS_IDLE;
                  IDSetNumber(&offxNPR, "Guider is offline.");
+                 IDMessage(mydev, "Off X Guider is offline returning...");
                  return;
              }
 
@@ -637,21 +639,26 @@ IDDefSwitch(&ufSP, NULL);
 
 	     if(autoFocusS[0].s == ISS_ON)
 	     {
+              IDMessage(mydev, "Autofoc on, moving stage before Off X move");
              	stageGoTo(RS485_FD, offFocNPR.name, (int)((zmm + zprimemm + focus_curve_subtraction)/ENCODER2MM));
 	     }
+            IDMessage(mydev, "Moving off X stage");
              stageGoTo(RS485_FD, offxNPR.name, (int)((values[0]+XOFFSET)/ENCODER2MM));
 	
 	     offxNPR.s = IPS_IDLE;
 	     IDSetNumber(&offxNPR, NULL);
+       IDMessage(mydev, "Off X Success! Returning...");
              return;
 	}
 	else if (!strcmp (name, offyNPR.name)) {
              /* new Y Position */
              /* Check connectSP, if it is idle, then return */
+             IDMessage(mydev, "Starting Off Y move...");
              if (connectSP.s == IPS_IDLE)
              {
                  offyNPR.s = IPS_IDLE;
                  IDSetNumber(&offyNPR, "Guider is offline.");
+                 IDMessage(mydev, "Off Y Guider is offline returning...");
                  return;
              } 
  
@@ -662,14 +669,17 @@ IDDefSwitch(&ufSP, NULL);
 	     focus_curve_subtraction = focus_trans(xmm, values[0]);
 	     if(autoFocusS[0].s == ISS_ON)
 	     {
+              IDMessage(mydev, "Autofoc on, moving stage before Off Y move");
              	stageGoTo(RS485_FD, offFocNPR.name, (int)((zmm + zprimemm + focus_curve_subtraction)/ENCODER2MM));
 	     }
 
-             //TODO check which mirros is in.
+             // TODO check which mirros is in.
+             IDMessage(mydev, "Moving off Y stage");
              stageGoTo(RS485_FD, offyNPR.name, (int)((values[0]+YOFFSET)/ENCODER2MM));
 	
 	     offyNPR.s = IPS_IDLE;
 	     IDSetNumber(&offyNPR, NULL);
+       IDMessage(mydev, "Off Y Success! Returning...");
              return;
 	    }
 	else if (!strcmp (name, ufwNPR.name)) {
