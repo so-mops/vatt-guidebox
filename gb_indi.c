@@ -634,7 +634,7 @@ IDDefSwitch(&ufSP, NULL);
              ymm = offyNPR.np[0].value;
 	     zmm = offFocInputNPR.np[0].value;
 	     zprimemm = offFocInputNPR.np[1].value;
-	     delta_focusmm = focus_trans(values[0], ymm);
+	     //delta_focusmm = focus_trans(values[0], ymm);
 	     focus_curve_subtraction = focus_trans(values[0], ymm);
 
 	     if(autoFocusS[0].s == ISS_ON)
