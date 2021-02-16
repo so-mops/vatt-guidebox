@@ -749,8 +749,8 @@ IDDefSwitch(&ufSP, NULL);
 	    }
 	else{
              /* unknown value*/
-             
-	    }
+             IDMessage(mydev, "New Number not recognized.");
+      }
 	
 	
  }
