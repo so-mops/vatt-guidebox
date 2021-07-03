@@ -991,7 +991,7 @@ C411 ' Release the solenoid
 	ENDIF
 	WAIT=1000
 	OR(9)
-	OS(7) OS(8)
+	OS(7) OS(8) ' turn sol sensor on
 	WAIT=100
 	WHILE IN(6) == 1
 		WAIT=100
@@ -1002,6 +1002,7 @@ C411 ' Release the solenoid
 	' or when we move filter wheels (GOSUB400)
 	AT:FWHEEL_UPPER=0
 	AT:FWHEEL_LOWER=0
+	OR(7) OR(8) ' turn sol sensor off
 	IF DEBUG PRINT("SOLENOID RELEASED", #13) ENDIF
 	
 RETURN
