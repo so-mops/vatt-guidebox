@@ -466,8 +466,10 @@ int moog_init(int rs485_fd )
 	usleep(200000);
 
 	usleep(200000);
-	moog_write(rs485_fd, "aa:2=100000"); // lower the y velocity
-	moog_write(rs485_fd, "VT:2=100000"); // lower the y velocity
+	//moog_write(rs485_fd, "aa:2=100000"); // lower the y velocity
+	//moog_write(rs485_fd, "VT:2=100000"); // lower the y velocity
+	moog_write(rs485_fd, "aa:2=50000"); // lower the y velocity
+	moog_write(rs485_fd, "VT:2=50000"); // lower the y velocity
 	while ( moog_read(rs485_fd, resp) !=-1 )
 	{
 		printf("%s\n", resp);// starting head node print a bunch of stuff
